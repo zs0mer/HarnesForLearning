@@ -92,8 +92,8 @@ function encryptedStore(file, safeStorage) {
 			} catch {
 				throw fail("storage");
 			} finally {
-				await handle?.close().catch(() => {});
-				await fs.unlink(temp).catch(() => {});
+				await handle?.close().catch(() => { });
+				await fs.unlink(temp).catch(() => { });
 			}
 		},
 	};
@@ -106,7 +106,7 @@ function allowedAuthEndpoint(value) {
 	} catch { return false; }
 }
 
-function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch, onChange = () => {}, timeoutMs = 180000 }) {
+function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch, onChange = () => { }, timeoutMs = 180000 }) {
 	let state;
 	let init;
 	let queue = Promise.resolve();
@@ -130,7 +130,7 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 	let backgroundAbort = new AbortController();
 	const serial = (fn) => {
 		const next = queue.then(fn, fn);
-		queue = next.catch(() => {});
+		queue = next.catch(() => { });
 		return next;
 	};
 	const active = () => !storageDenied && !suspended && !closed && !paused ? state?.registrations.find((r) => r.id === state.activeId && r.tokens && !r.reconnectRequired) : undefined;
@@ -249,8 +249,10 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 		const scopes = typeof body.scope === "string" ? body.scope.split(/\s+/) : previous?.scopes;
 		if (!scopes || SCOPES.some((scope) => !scopes.includes(scope))) {
 			// Lack of entitlement is not lack of revocable material.
-			return { idToken: body.id_token ?? previous?.idToken, scopes: scopes ?? [], expiresAt: 0,
-				...(nonempty(body.refresh_token) ? { refreshToken: body.refresh_token } : previous?.refreshToken ? { refreshToken: previous.refreshToken } : {}) };
+			return {
+				idToken: body.id_token ?? previous?.idToken, scopes: scopes ?? [], expiresAt: 0,
+				...(nonempty(body.refresh_token) ? { refreshToken: body.refresh_token } : previous?.refreshToken ? { refreshToken: previous.refreshToken } : {})
+			};
 		}
 		if (typeof body.access_token !== "string" || !body.access_token || body.access_token.startsWith("sk-") || body.token_type?.toLowerCase() !== "bearer" || !Number.isFinite(body.expires_in) || body.expires_in <= 0) throw fail("identity");
 		const refreshToken = body.refresh_token ?? previous?.refreshToken;

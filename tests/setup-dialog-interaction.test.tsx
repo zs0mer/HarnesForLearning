@@ -25,7 +25,7 @@ Object.assign(globalThis, {
 	cancelAnimationFrame: (id: number) => clearTimeout(id),
 });
 Object.assign(dom.window, { innerWidth: 1280, innerHeight: 800 });
-dom.window.HTMLElement.prototype.scrollIntoView = () => {};
+dom.window.HTMLElement.prototype.scrollIntoView = () => { };
 
 const originalFetch = globalThis.fetch;
 const provider = { id: "openrouter", envVar: "OPENROUTER_API_KEY", label: "OpenRouter" };

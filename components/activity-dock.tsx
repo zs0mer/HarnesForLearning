@@ -76,7 +76,7 @@ const EMPTY_FEED: ActivityFeed = { jobs: [], extractions: [] };
 
 const ActivityContext = createContext<{ feed: ActivityFeed; refresh: () => void }>({
 	feed: EMPTY_FEED,
-	refresh: () => {},
+	refresh: () => { },
 });
 
 /**
@@ -349,7 +349,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 				{blobs.length > 0 && (
 					<span className="ml-auto tabular-nums" data-testid="activity-total-cost" title="Total running cost (inferred)">
 						{planCostLabel(totalCost, blobs.some((blob) => isSubscriptionPlan(blob.model)), undefined, subscriptionPlanLabel(blobs.map((blob) => blob.model)))}
-				</span>
+					</span>
 				)}
 			</div>
 			{blobs.length > 0 && (
@@ -365,7 +365,7 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 							onAbort={() => void abort(blob)}
 						/>
 					))}
-			</div>
+				</div>
 			)}
 		</section>
 	);
@@ -490,9 +490,9 @@ function ActivityBlobRow({
 						</a>
 					</div>
 					<div className="mt-2 text-muted-foreground/80">
-					{abortState === "failed" && "Abort failed — try again"}
-					{abortState === "pending" && "Stopping…"}
-				</div>
+						{abortState === "failed" && "Abort failed — try again"}
+						{abortState === "pending" && "Stopping…"}
+					</div>
 				</div>
 			)}
 		</div>

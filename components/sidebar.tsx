@@ -75,7 +75,7 @@ declare global {
 
 const SidebarContext = createContext<{ open: boolean; toggle: () => void }>({
 	open: false,
-	toggle: () => {},
+	toggle: () => { },
 });
 
 export function useSidebar() {
@@ -199,20 +199,20 @@ export function SidebarToggle() {
 			)}
 		>
 			<Hint label="Open sidebar" action="toggle-sidebar">
-			<Button
-				variant="ghost"
-				size="icon"
-				aria-label="Open sidebar"
-				aria-hidden={open}
-				tabIndex={open ? -1 : 0}
-				onClick={toggle}
-				className={cn("sidebar-motion duration-200", open ? "pointer-events-none opacity-0" : "opacity-100")}
-			>
-				{/* Owner, round 6: size-4, SAME as the close glyph — the toggle
+				<Button
+					variant="ghost"
+					size="icon"
+					aria-label="Open sidebar"
+					aria-hidden={open}
+					tabIndex={open ? -1 : 0}
+					onClick={toggle}
+					className={cn("sidebar-motion duration-200", open ? "pointer-events-none opacity-0" : "opacity-100")}
+				>
+					{/* Owner, round 6: size-4, SAME as the close glyph — the toggle
 				    must not grow when the sidebar is closed (it did: size-5 here).
 				    The small look is the standard, both directions. */}
-				<PanelLeftOpenIcon className="size-4" />
-			</Button>
+					<PanelLeftOpenIcon className="size-4" />
+				</Button>
 			</Hint>
 		</span>
 	);
@@ -398,9 +398,9 @@ function SessionsSidebar() {
 	const { open: openSettings } = useSettingsDialog();
 
 	/* New session (owner, 2026-09-13): NO POST — the button opens the
-	   sessionless draft view; the session is created only when the first
-	   message is sent (and that message becomes its title). Search: a
-	   client-side filter over the poll snapshot — no server round trip. */
+		 sessionless draft view; the session is created only when the first
+		 message is sent (and that message becomes its title). Search: a
+		 client-side filter over the poll snapshot — no server round trip. */
 	const newSession = useCallback(() => {
 		router.push("/chat/new");
 	}, [router]);
@@ -443,8 +443,8 @@ function SessionsSidebar() {
 	}, []);
 
 	/* Instant rename propagation (2026-09-17): the chat header's rename
-	   commits dispatch lh:chat-renamed; patch the snapshot in place instead
-	   of waiting for the 2.5s poll. */
+		 commits dispatch lh:chat-renamed; patch the snapshot in place instead
+		 of waiting for the 2.5s poll. */
 	useEffect(() => {
 		const onRenamed = (e: Event) => {
 			const { id, title } = (e as CustomEvent<{ id: string; title: string }>).detail;
@@ -455,15 +455,15 @@ function SessionsSidebar() {
 	}, []);
 
 	/* INSTANT TURN-STATE (owner, sidebar round 2026-10-02): the open
-	   session broadcasts lh:turn-state the instant its turn starts
-	   (submitted — the optimistic machine's own flip) and at settle —
-	   busy mirrors the server's own definition (isTurnRunning), so the
-	   patch is exact: spinner up the moment the action happens, cleared
-	   and refetched once at settle (title/order move with turns). The
-	   events channel is the backstop for everything only the server
-	   knows: other windows, wake turns in unopened sessions. A start on
-	   a chat not yet in the snapshot (a brand-new session) = one
-	   immediate refresh instead of a patch. */
+		 session broadcasts lh:turn-state the instant its turn starts
+		 (submitted — the optimistic machine's own flip) and at settle —
+		 busy mirrors the server's own definition (isTurnRunning), so the
+		 patch is exact: spinner up the moment the action happens, cleared
+		 and refetched once at settle (title/order move with turns). The
+		 events channel is the backstop for everything only the server
+		 knows: other windows, wake turns in unopened sessions. A start on
+		 a chat not yet in the snapshot (a brand-new session) = one
+		 immediate refresh instead of a patch. */
 	const chatsRef = useRef(chats);
 	chatsRef.current = chats;
 	useEffect(() => {
@@ -485,14 +485,14 @@ function SessionsSidebar() {
 	}, [refresh]);
 
 	/* PUSH (architecture S6, 2026-10-02): the 2.5s poll is RETIRED — the
-	   last standing network poll in the app. List truth arrives as
-	   events: chats-changed (create/rename/delete — the list-SHAPE
-	   writes), and turn-started/turn-settled for EVERY chat (unfiltered:
-	   any chat's turn flips busy/order/phase in this list). Announced
-	   fetches ride the 250ms trailing debounce (the S4/S5 law); resync
-	   (reconnect / dev-restart) is immediate. lh:turn-state +
-	   lh:chat-renamed stay for same-tab INSTANTS — local beats any
-	   round-trip. */
+		 last standing network poll in the app. List truth arrives as
+		 events: chats-changed (create/rename/delete — the list-SHAPE
+		 writes), and turn-started/turn-settled for EVERY chat (unfiltered:
+		 any chat's turn flips busy/order/phase in this list). Announced
+		 fetches ride the 250ms trailing debounce (the S4/S5 law); resync
+		 (reconnect / dev-restart) is immediate. lh:turn-state +
+		 lh:chat-renamed stay for same-tab INSTANTS — local beats any
+		 round-trip. */
 	const refreshRef = useRef(refresh);
 	refreshRef.current = refresh;
 	const eventDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -516,27 +516,27 @@ function SessionsSidebar() {
 	);
 
 	/* ── Keyboard seams (shortcut wave A, 2026-09-17; search-walk round
-	   2026-10-10) ── ⌘⇧F focuses the search field — and THE SEARCH OWNS THE
-	   WALK: ↑/↓ cycle the filtered list (wrap — "cycle"), Enter opens the
-	   walked row, or the FIRST match when nothing is walked (owner,
-	   2026-10-10 — the quick-open pattern: ⌘⇧F, type, Enter, done). The
-	   Alt+↑/↓/↵ global cycle was RETIRED the same round: barely used,
-	   felt laggy. The selection is a row index into `shown`, so the walk
-	   follows whatever the query + kind filter leave. Mouse and keyboard
-	   coexist: hovering doesn't claim, a click or an open clears the
-	   selection. */
+		 2026-10-10) ── ⌘⇧F focuses the search field — and THE SEARCH OWNS THE
+		 WALK: ↑/↓ cycle the filtered list (wrap — "cycle"), Enter opens the
+		 walked row, or the FIRST match when nothing is walked (owner,
+		 2026-10-10 — the quick-open pattern: ⌘⇧F, type, Enter, done). The
+		 Alt+↑/↓/↵ global cycle was RETIRED the same round: barely used,
+		 felt laggy. The selection is a row index into `shown`, so the walk
+		 follows whatever the query + kind filter leave. Mouse and keyboard
+		 coexist: hovering doesn't claim, a click or an open clears the
+		 selection. */
 	const [kbdIndex, setKbdIndex] = useState<number | null>(null);
 	const searchRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLDivElement>(null);
 
 	/* ── Wave 6 chunk A: context menu + inline rename + deletion ──
-	   Right-click a session row → MenuShell: the two management actions
-	   first (owner ruling), then — below a hairline — the extraction
-	   coverage block (owner-locked redesign 2026-09-24, order refined
-	   2026-09-24: Rename/Delete on top, the numbers + manual Extract
-	   affordance at the bottom). The anchor is the row that was
-	   right-clicked — assigned into a ref before the state flip so the
-	   shell measures it on its first (hidden) pass. */
+		 Right-click a session row → MenuShell: the two management actions
+		 first (owner ruling), then — below a hairline — the extraction
+		 coverage block (owner-locked redesign 2026-09-24, order refined
+		 2026-09-24: Rename/Delete on top, the numbers + manual Extract
+		 affordance at the bottom). The anchor is the row that was
+		 right-clicked — assigned into a ref before the state flip so the
+		 shell measures it on its first (hidden) pass. */
 	const [ctxChatId, setCtxChatId] = useState<string | null>(null);
 	const ctxAnchorRef = useRef<HTMLElement | null>(null);
 	const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -713,61 +713,61 @@ function SessionsSidebar() {
 				<div className="mx-3 mb-2 flex items-center gap-2">
 					<span className="text-xs uppercase tracking-widest text-muted-foreground/70">Sessions</span>
 					<Hint label="Search sessions" action="sessions-search" side="bottom">
-					<span className="relative flex-1">
-						<Input
-							ref={searchRef}
-							data-testid="session-search"
-							value={query}
-							onChange={(e) => {
-								setQuery(e.target.value);
-								// The list reorders under the query every keystroke —
-								// a stale walk index would point at the wrong row.
-								setKbdIndex(null);
-							}}
-							// THE SEARCH OWNS THE WALK (owner, 2026-10-10 — the
-							// retired Alt+↑/↓/↵ cycle's successor): ↑/↓ cycle the
-							// filtered rows (wrap), Enter opens the walked row —
-							// or the FIRST match when nothing is walked (the
-							// quick-open pattern) — then blurs (focus returns to
-							// the app per the Enter law; the query stays for
-							// re-searching). Esc leaves the search (owner,
-							// keyboard wave): blur back to normal, and claim the
-							// key so the window Esc chain (dictation / abort)
-							// doesn't also fire.
-							onKeyDown={(e) => {
-								if (e.key === "Escape") {
-									e.stopPropagation();
-									e.currentTarget.blur();
-									return;
-								}
-								// Modified keys belong to the surface (⇧↵ etc.).
-								if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-								const n = shown?.length ?? 0;
-								if (n === 0) return;
-								if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-									// The rows move, not the caret.
-									e.preventDefault();
-									const dir = e.key === "ArrowDown" ? 1 : -1;
-									setKbdIndex((i) =>
-										i === null || i >= n ? (dir === 1 ? 0 : n - 1) : (i + dir + n) % n,
-										);
-									return;
-								}
-								if (e.key === "Enter") {
-									const target = shown![kbdIndex !== null && kbdIndex < n ? kbdIndex : 0];
-									if (!target) return;
-									e.preventDefault();
-									router.push(`/chat/${target.id}`);
+						<span className="relative flex-1">
+							<Input
+								ref={searchRef}
+								data-testid="session-search"
+								value={query}
+								onChange={(e) => {
+									setQuery(e.target.value);
+									// The list reorders under the query every keystroke —
+									// a stale walk index would point at the wrong row.
 									setKbdIndex(null);
-									e.currentTarget.blur();
-								}
-							}}
-							placeholder="Search…"
-							aria-label="Search sessions"
-							className="h-6 rounded-sm border-border bg-background pl-6 text-xs placeholder:text-muted-foreground/60"
-						/>
-						<SearchIcon className="pointer-events-none absolute left-1.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground/70" />
-					</span>
+								}}
+								// THE SEARCH OWNS THE WALK (owner, 2026-10-10 — the
+								// retired Alt+↑/↓/↵ cycle's successor): ↑/↓ cycle the
+								// filtered rows (wrap), Enter opens the walked row —
+								// or the FIRST match when nothing is walked (the
+								// quick-open pattern) — then blurs (focus returns to
+								// the app per the Enter law; the query stays for
+								// re-searching). Esc leaves the search (owner,
+								// keyboard wave): blur back to normal, and claim the
+								// key so the window Esc chain (dictation / abort)
+								// doesn't also fire.
+								onKeyDown={(e) => {
+									if (e.key === "Escape") {
+										e.stopPropagation();
+										e.currentTarget.blur();
+										return;
+									}
+									// Modified keys belong to the surface (⇧↵ etc.).
+									if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+									const n = shown?.length ?? 0;
+									if (n === 0) return;
+									if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+										// The rows move, not the caret.
+										e.preventDefault();
+										const dir = e.key === "ArrowDown" ? 1 : -1;
+										setKbdIndex((i) =>
+											i === null || i >= n ? (dir === 1 ? 0 : n - 1) : (i + dir + n) % n,
+										);
+										return;
+									}
+									if (e.key === "Enter") {
+										const target = shown![kbdIndex !== null && kbdIndex < n ? kbdIndex : 0];
+										if (!target) return;
+										e.preventDefault();
+										router.push(`/chat/${target.id}`);
+										setKbdIndex(null);
+										e.currentTarget.blur();
+									}
+								}}
+								placeholder="Search…"
+								aria-label="Search sessions"
+								className="h-6 rounded-sm border-border bg-background pl-6 text-xs placeholder:text-muted-foreground/60"
+							/>
+							<SearchIcon className="pointer-events-none absolute left-1.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground/70" />
+						</span>
 					</Hint>
 				</div>
 
@@ -830,106 +830,106 @@ function SessionsSidebar() {
 					)}
 				</div>
 
-					{/* Background agents (owner, sidebar round): the section is
+				{/* Background agents (owner, sidebar round): the section is
 					    ALWAYS here — empty means empty (the header sits alone); it
 					    populates and grows when processes run. The session list is
 					    flex-1, so this pins to the bottom. Sidebar closed = the
 					    learner opted out (no ambient signal, user decision). */}
-					<ActivitySection />
+				<ActivitySection />
 
-					{/* Settings entry (settings-app wave): same row language as
+				{/* Settings entry (settings-app wave): same row language as
 					    New session — quiet, bottom-pinned, opens the centered
 					    dialog (also mod+, in the keyboard registry). */}
-					<div className="px-3 pb-3 pt-1">
-						<Hint label="Settings" action="open-settings" side="right">
-							<button
-								type="button"
-								onClick={() => openSettings()}
-								data-testid="settings-entry"
-								className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-							>
-								<SettingsIcon className="size-3" />
-								Settings
-							</button>
-						</Hint>
-					</div>
+				<div className="px-3 pb-3 pt-1">
+					<Hint label="Settings" action="open-settings" side="right">
+						<button
+							type="button"
+							onClick={() => openSettings()}
+							data-testid="settings-entry"
+							className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+						>
+							<SettingsIcon className="size-3" />
+							Settings
+						</button>
+					</Hint>
 				</div>
+			</div>
 
-				{/* The context menu (wave 6 + the extraction-UX redesign): the
+			{/* The context menu (wave 6 + the extraction-UX redesign): the
 				    coverage block above, then exactly two management actions
 				    (owner ruling — no more). MenuShell owns placement/focus/arrow
 				    cycling; the dismissal effect above owns the contract. */}
-				{ctxChatId !== null && (
-					<MenuShell
-						anchorRef={ctxAnchorRef}
-						testid="session-context-menu"
-						preferredSide="down"
-						menuClass="flex w-52 flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"
-					>
-						{/* The two management actions first, then the extraction block
+			{ctxChatId !== null && (
+				<MenuShell
+					anchorRef={ctxAnchorRef}
+					testid="session-context-menu"
+					preferredSide="down"
+					menuClass="flex w-52 flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"
+				>
+					{/* The two management actions first, then the extraction block
 						    (owner refinement round, 2026-09-24): Rename/Delete stay at the
 						    top, the coverage numbers + Extract affordance sit below the
 						    hairline — the block is info + a stateful affordance, the
 						    actions above it. Fetched on menu open (the block mounts WITH
 						    the menu); 409 = benign. Renders nothing on a failed read. */}
-						<button
-							type="button"
-							data-testid="ctx-rename"
-							onClick={() => {
-								setRenamingId(ctxChatId);
-								setCtxChatId(null);
-							}}
-							className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-foreground transition-colors hover:bg-accent"
-						>
-							Rename
-						</button>
-						{/* Export as Markdown (owner, release polish 2026-10-06): the
+					<button
+						type="button"
+						data-testid="ctx-rename"
+						onClick={() => {
+							setRenamingId(ctxChatId);
+							setCtxChatId(null);
+						}}
+						className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-foreground transition-colors hover:bg-accent"
+					>
+						Rename
+					</button>
+					{/* Export as Markdown (owner, release polish 2026-10-06): the
 					    session-markdown engine's user-facing debut — same-origin
 						    anchor download; the route's Content-Disposition names the
 						    file. Sits with the management actions, above Delete (the
 						    destructive action stays last — the danger-fence law). */}
-						<button
-							type="button"
-							data-testid="ctx-export-md"
-							onClick={() => {
-								const chatId = ctxChatId;
-								setCtxChatId(null);
-								const a = document.createElement("a");
-								a.href = `/api/chats/${chatId}/markdown`;
-								a.download = ""; // the route's filename wins
-								document.body.appendChild(a);
-								a.click();
-								a.remove();
-							}}
-							className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-foreground transition-colors hover:bg-accent"
-						>
-							Export as Markdown…
-						</button>
-						<button
-							type="button"
-							data-testid="ctx-delete"
-							onClick={() => {
-								const target = chats?.find((c) => c.id === ctxChatId);
-								if (target) setDeleting(target);
-								setCtxChatId(null);
-							}}
-							className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
-						>
-							Delete…
-						</button>
-						<div className="my-0.5 border-t border-border/60" aria-hidden="true" />
-						<CoverageMenuBlock chatId={ctxChatId} />
-					</MenuShell>
-				)}
+					<button
+						type="button"
+						data-testid="ctx-export-md"
+						onClick={() => {
+							const chatId = ctxChatId;
+							setCtxChatId(null);
+							const a = document.createElement("a");
+							a.href = `/api/chats/${chatId}/markdown`;
+							a.download = ""; // the route's filename wins
+							document.body.appendChild(a);
+							a.click();
+							a.remove();
+						}}
+						className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-foreground transition-colors hover:bg-accent"
+					>
+						Export as Markdown…
+					</button>
+					<button
+						type="button"
+						data-testid="ctx-delete"
+						onClick={() => {
+							const target = chats?.find((c) => c.id === ctxChatId);
+							if (target) setDeleting(target);
+							setCtxChatId(null);
+						}}
+						className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+					>
+						Delete…
+					</button>
+					<div className="my-0.5 border-t border-border/60" aria-hidden="true" />
+					<CoverageMenuBlock chatId={ctxChatId} />
+				</MenuShell>
+			)}
 
-				{/* The two-option delete dialog (wave 6) — portaled to body
+			{/* The two-option delete dialog (wave 6) — portaled to body
 				    by the component itself, lives here for state locality. */}
-				<DeleteSessionDialog
-					chat={deleting}
-					onClose={() => setDeleting(null)}
-					onDeleted={onDeleted}
-				/>
-			</aside>
+			<DeleteSessionDialog
+				chat={deleting}
+				onClose={() => setDeleting(null)}
+				onDeleted={onDeleted}
+			/>
+		</aside>
 	);
 }
 

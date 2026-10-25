@@ -17,19 +17,19 @@ const mainRequire = createRequire(mainFile);
  * constructor options. No rewritten copy of the production logic. */
 function windowOptions(platform: string) {
 	class FakeWindow {
-		constructor(readonly options: unknown) {}
-		webContents = { on() {}, setWindowOpenHandler() {} };
-		loadURL() {}
-		once() {}
+		constructor(readonly options: unknown) { }
+		webContents = { on() { }, setWindowOpenHandler() { } };
+		loadURL() { }
+		once() { }
 	}
 	const electron = {
-		app: { setName() {}, requestSingleInstanceLock: () => false, quit() {} },
+		app: { setName() { }, requestSingleInstanceLock: () => false, quit() { } },
 		BrowserWindow: FakeWindow,
-		session: { defaultSession: { setPermissionRequestHandler() {}, setPermissionCheckHandler() {} } },
+		session: { defaultSession: { setPermissionRequestHandler() { }, setPermissionCheckHandler() { } } },
 	};
 	const context = {
 		require: (id: string) => id === "electron" ? electron : mainRequire(id),
-		process: { platform, argv: [], env: {}, on() {} },
+		process: { platform, argv: [], env: {}, on() { } },
 		__dirname: dirname(mainFile),
 	};
 	runInNewContext(mainSource, context, { filename: mainFile });
@@ -37,6 +37,37 @@ function windowOptions(platform: string) {
 	// The options originate in a VM realm; normalize prototypes for assertions.
 	return JSON.parse(JSON.stringify(win.options));
 }
+
+describe("desktop credential backend selection", () => {
+	const { configurePasswordStore } = require("../electron/password-store.cjs");
+	function selection(platform: string, env: Record<string, string | undefined>, explicit = false) {
+		const switches: string[][] = [];
+		configurePasswordStore({
+			commandLine: {
+				hasSwitch: (name: string) => { assert.equal(name, "password-store"); return explicit; },
+				appendSwitch: (...args: string[]) => switches.push(args),
+			}
+		}, platform, env);
+		return switches;
+	}
+	it("selects GNOME Keyring on Hyprland, including composite desktop identities", () => {
+		for (const env of [
+			{ XDG_CURRENT_DESKTOP: "Hyprland" },
+			{ XDG_CURRENT_DESKTOP: "Hyprland:wlroots" },
+			{ XDG_SESSION_DESKTOP: "hyprland" },
+			{ DESKTOP_SESSION: "hyprland" },
+		]) assert.deepEqual(selection("linux", env), [["password-store", "gnome-libsecret"]]);
+	});
+	it("preserves explicit overrides and defaults on other platforms or desktops", () => {
+		assert.deepEqual(selection("linux", { XDG_CURRENT_DESKTOP: "Hyprland" }, true), []);
+		for (const platform of ["darwin", "win32"]) {
+			assert.deepEqual(selection(platform, { XDG_CURRENT_DESKTOP: "Hyprland" }), []);
+		}
+		for (const desktop of ["GNOME", "KDE", "sway", ""]) {
+			assert.deepEqual(selection("linux", { XDG_CURRENT_DESKTOP: desktop }), []);
+		}
+	});
+});
 
 describe("desktop window chrome", () => {
 	it("macOS keeps the proven traffic lights and does not enable WCO", () => {
@@ -89,10 +120,10 @@ describe("desktop packaging policy", () => {
 			require: (id: string) => {
 				assert.notEqual(id, "electron-updater", "must not register cached-update quit hooks");
 				return id === "electron"
-					? { app: { isPackaged: true, setName() {}, requestSingleInstanceLock: () => false, quit() {} } }
+					? { app: { isPackaged: true, setName() { }, requestSingleInstanceLock: () => false, quit() { } } }
 					: mainRequire(id);
 			},
-			process: { platform: "linux", argv: [], env: { LH_UPDATE_FEED: "https://example.com" }, on() {} },
+			process: { platform: "linux", argv: [], env: { LH_UPDATE_FEED: "https://example.com" }, on() { } },
 			__dirname: dirname(mainFile),
 		};
 		runInNewContext(mainSource, context, { filename: mainFile });
@@ -189,10 +220,10 @@ describe("desktop release workflow", () => {
 	/** Execute the REAL action script with an in-memory GitHub API. */
 	async function prepareDraft(releases: Release[]) {
 		const created: Record<string, unknown>[] = [];
-		const listReleases = () => {};
+		const listReleases = () => { };
 		await runInNewContext(`(async () => { ${script} })()`, {
 			context: { repo: { owner: "test-owner", repo: "test-repo" }, ref: "refs/tags/v0.3.0" },
-			core: { info() {} },
+			core: { info() { } },
 			github: {
 				paginate: async (method: unknown, options: unknown) => {
 					assert.equal(method, listReleases);
@@ -201,13 +232,15 @@ describe("desktop release workflow", () => {
 					});
 					return releases;
 				},
-				rest: { repos: {
-					listReleases,
-					createRelease: async (options: Record<string, unknown>) => {
-						created.push(JSON.parse(JSON.stringify(options)));
-						return { data: { id: 123 } };
-					},
-				} },
+				rest: {
+					repos: {
+						listReleases,
+						createRelease: async (options: Record<string, unknown>) => {
+							created.push(JSON.parse(JSON.stringify(options)));
+							return { data: { id: 123 } };
+						},
+					}
+				},
 			},
 		});
 		return created;

@@ -85,7 +85,7 @@ async function probe(standalone) {
 		const copilot = (await import(new URL("providers/github-copilot.js", entry).href)).githubCopilotProvider();
 		const copilotAuth = await copilot.auth.oauth.toAuth({ type: "oauth", access: "offline-only", refresh: "offline-only", expires: 0, availableModelIds: [] });
 		assert.equal(copilotAuth.baseUrl, "https://api.individual.githubcopilot.com");
-		await assert.rejects(copilot.auth.oauth.login({ signal: AbortSignal.abort(), prompt: async () => "", notify() {} }), /abort|cancel/i);
+		await assert.rejects(copilot.auth.oauth.login({ signal: AbortSignal.abort(), prompt: async () => "", notify() { } }), /abort|cancel/i);
 		noNetwork();
 		console.log("[smoke-provider-runtime] Copilot lazy OAuth loaded and cancelled offline");
 		const models = createModels();

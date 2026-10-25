@@ -417,16 +417,16 @@ export function SetupDialog({
 				<header className="flex h-15 shrink-0 items-center gap-3 border-b border-border px-5">
 					<h2 className="font-title text-2xl tracking-tight">Set up your models</h2>
 					<Hint label="Close" binding="escape" side="left">
-<button
-						type="button"
-						aria-label="Close setup"
-						data-testid="setup-close"
-						onClick={onClose}
-						className="ml-auto text-muted-foreground transition-colors hover:text-foreground"
-					>
-						✕
-					</button>
-</Hint>
+						<button
+							type="button"
+							aria-label="Close setup"
+							data-testid="setup-close"
+							onClick={onClose}
+							className="ml-auto text-muted-foreground transition-colors hover:text-foreground"
+						>
+							✕
+						</button>
+					</Hint>
 				</header>
 
 				{stage === "keys" ? (

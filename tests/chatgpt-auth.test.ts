@@ -49,11 +49,13 @@ function fixture(options: { state?: any; expires?: number; timeoutMs?: number; t
 		const catalog = await discovered;
 		return rawLease(background, { expectedAccountId: catalog.accountId ?? saved.activeId ?? "scratch-missing", expectedAuthorityRevision: catalog.authorityRevision, selectedModelId: "gpt-5" });
 	};
-	return { service, rawLease, requests, changed, get url() { return url; }, get saved() { return saved; }, get writeCount() { return writeCount; }, async callback(params: Record<string, string> = {}) {
-		const callback = new URL(url.searchParams.get("redirect_uri")!);
-		callback.search = new URLSearchParams({ state: url.searchParams.get("state")!, code: "scratch-code", client_id: "oaiapp_scratch", ...params }).toString();
-		return fetch(callback);
-	} };
+	return {
+		service, rawLease, requests, changed, get url() { return url; }, get saved() { return saved; }, get writeCount() { return writeCount; }, async callback(params: Record<string, string> = {}) {
+			const callback = new URL(url.searchParams.get("redirect_uri")!);
+			callback.search = new URLSearchParams({ state: url.searchParams.get("state")!, code: "scratch-code", client_id: "oaiapp_scratch", ...params }).toString();
+			return fetch(callback);
+		}
+	};
 }
 async function loggedIn(options: Parameters<typeof fixture>[0] = {}) {
 	const f = fixture(options);
@@ -174,10 +176,12 @@ test("returning sign-in reuses issued client/host and fresh PKCE; rejects accoun
 
 for (const [label, claims] of [["nonce", { nonce: "wrong" }], ["issuer", { iss: "https://evil.invalid" }], ["audience", { aud: "oaiapp_wrong" }], ["expiry", { exp: 1 }]] as const) {
 	test(`rejects invalid ID-token ${label}`, async () => {
-		const f = fixture({ token: async (form, url) => {
-			const jwt = new SignJWT(Object.assign({ nonce: url.searchParams.get("nonce")!, email: "dummy@example.invalid", iss: "https://auth.openai.com", aud: form.get("client_id")!, sub: "scratch-user", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 }, claims));
-			return Response.json({ access_token: "scratch-access", refresh_token: "scratch-refresh", id_token: await jwt.setProtectedHeader({ alg: "RS256", kid: "scratch-key" }).sign(privateKey), token_type: "Bearer", expires_in: 3600, scope: SCOPES.join(" ") });
-		} });
+		const f = fixture({
+			token: async (form, url) => {
+				const jwt = new SignJWT(Object.assign({ nonce: url.searchParams.get("nonce")!, email: "dummy@example.invalid", iss: "https://auth.openai.com", aud: form.get("client_id")!, sub: "scratch-user", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 }, claims));
+				return Response.json({ access_token: "scratch-access", refresh_token: "scratch-refresh", id_token: await jwt.setProtectedHeader({ alg: "RS256", kid: "scratch-key" }).sign(privateKey), token_type: "Bearer", expires_in: 3600, scope: SCOPES.join(" ") });
+			}
+		});
 		try { await f.service.login(); await f.callback(); await f.changed.promise; assert.equal(f.saved.activeId, null); assert.equal(f.saved.registrations.length, 0); }
 		finally { f.service.close(); }
 	});
@@ -222,10 +226,12 @@ test("durable encrypted save failure never activates a pending login", async () 
 
 test("serialized concurrent refresh rotates once and persists before leases", async () => {
 	let refreshes = 0;
-	const f = await loggedIn({ expires: 1, token: async (form, url) => {
-		if (form.get("grant_type") === "refresh_token") { refreshes++; assert.equal(form.get("scope"), null); return Response.json({ access_token: "scratch-new-access", refresh_token: "scratch-rotated", token_type: "Bearer", expires_in: 3600 }); }
-		return Response.json({ access_token: "scratch-old-access", refresh_token: "scratch-old-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") });
-	} });
+	const f = await loggedIn({
+		expires: 1, token: async (form, url) => {
+			if (form.get("grant_type") === "refresh_token") { refreshes++; assert.equal(form.get("scope"), null); return Response.json({ access_token: "scratch-new-access", refresh_token: "scratch-rotated", token_type: "Bearer", expires_in: 3600 }); }
+			return Response.json({ access_token: "scratch-old-access", refresh_token: "scratch-old-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") });
+		}
+	});
 	try {
 		const leases = await Promise.all([f.service.lease(false), f.service.lease(false), f.service.lease(false)]);
 		assert.equal(refreshes, 1);
@@ -236,10 +242,12 @@ test("serialized concurrent refresh rotates once and persists before leases", as
 
 test("logout wins an in-flight refresh and retains only account/client/host mapping", async () => {
 	const started = deferred(); const release = deferred();
-	const f = await loggedIn({ token: async (form, url) => {
-		if (form.get("grant_type") === "refresh_token") { started.resolve(); await release.promise; return Response.json({ access_token: "scratch-late", refresh_token: "scratch-rotated", token_type: "Bearer", expires_in: 3600 }); }
-		return Response.json({ access_token: "scratch-old", refresh_token: "scratch-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") });
-	} });
+	const f = await loggedIn({
+		token: async (form, url) => {
+			if (form.get("grant_type") === "refresh_token") { started.resolve(); await release.promise; return Response.json({ access_token: "scratch-late", refresh_token: "scratch-rotated", token_type: "Bearer", expires_in: 3600 }); }
+			return Response.json({ access_token: "scratch-old", refresh_token: "scratch-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") });
+		}
+	});
 	try {
 		const id = f.saved.activeId;
 		const refresh = f.service.lease(false); const rejected = assert.rejects(refresh);
@@ -289,9 +297,11 @@ test("safeStorage refuses basic_text/unavailable; encrypted file owner-only, ato
 });
 
 test("invalid rotating replacement is durably revocation-only; verified mapping and prior validated ID survive restart", async () => {
-	const f = await loggedIn({ expires: 1, token: async (form, url) => form.get("grant_type") === "refresh_token"
-		? Response.json({ access_token: "never-save-this-access", refresh_token: "likely-latest-revoke-handle", id_token: "invalid.signature.jwt", token_type: "Bearer", expires_in: 3600 })
-		: Response.json({ access_token: "old-verified-access", refresh_token: "old-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") }) });
+	const f = await loggedIn({
+		expires: 1, token: async (form, url) => form.get("grant_type") === "refresh_token"
+			? Response.json({ access_token: "never-save-this-access", refresh_token: "likely-latest-revoke-handle", id_token: "invalid.signature.jwt", token_type: "Bearer", expires_in: 3600 })
+			: Response.json({ access_token: "old-verified-access", refresh_token: "old-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") })
+	});
 	try {
 		const before = structuredClone(f.saved.registrations[0]);
 		await assert.rejects(f.service.lease(false));
@@ -443,10 +453,12 @@ test("explicit disconnect forgets all exact-identity registrations/handles, abor
 	state.registrations.push(duplicate, other);
 	const pushes: any[] = [], entered = deferred(), release = deferred();
 	let held = false;
-	const f = fixture({ state, change: (push) => pushes.push(push), provider: async (url) => {
-		if (url.endsWith("/revoke") && !held) { held = true; entered.resolve(); await release.promise; }
-		return undefined;
-	} });
+	const f = fixture({
+		state, change: (push) => pushes.push(push), provider: async (url) => {
+			if (url.endsWith("/revoke") && !held) { held = true; entered.resolve(); await release.promise; }
+			return undefined;
+		}
+	});
 	try {
 		await f.service.status(); const catalog = await f.service.models();
 		const expected = { expectedAccountId: state.activeId, expectedAuthorityRevision: catalog.authorityRevision, selectedModelId: "gpt-5" };
@@ -501,13 +513,15 @@ test("signed-out legacy registrations can be explicitly forgotten; failed revoca
 
 test("disconnect racing refresh revokes the latest rotated handle before forgetting, never its stale predecessor", async () => {
 	const entered = deferred(), release = deferred();
-	const f = await loggedIn({ token: async (form, url) => {
-		if (form.get("grant_type") === "refresh_token") {
-			entered.resolve(); await release.promise;
-			return Response.json({ access_token: "latest-access", refresh_token: "latest-refresh", token_type: "Bearer", expires_in: 3600, scope: SCOPES.join(" ") });
+	const f = await loggedIn({
+		token: async (form, url) => {
+			if (form.get("grant_type") === "refresh_token") {
+				entered.resolve(); await release.promise;
+				return Response.json({ access_token: "latest-access", refresh_token: "latest-refresh", token_type: "Bearer", expires_in: 3600, scope: SCOPES.join(" ") });
+			}
+			return Response.json({ access_token: "scratch-access", refresh_token: "scratch-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") });
 		}
-		return Response.json({ access_token: "scratch-access", refresh_token: "scratch-refresh", id_token: await signed(form.get("client_id")!, url.searchParams.get("nonce")!), token_type: "Bearer", expires_in: 1, scope: SCOPES.join(" ") });
-	} });
+	});
 	try {
 		const lease = f.service.lease(false); const rejected = assert.rejects(lease); await entered.promise;
 		const forgetting = f.service.disconnect(f.saved.activeId); release.resolve(); await rejected; await forgetting;

@@ -98,9 +98,9 @@ export function rolePinsFor(
 		const spec = models[role];
 		pins[role] = spec
 			? {
-					model: { provider: spec.provider, id: spec.id },
-					...(spec.thinkingLevel !== undefined ? { thinkingLevel: spec.thinkingLevel } : {}),
-				}
+				model: { provider: spec.provider, id: spec.id },
+				...(spec.thinkingLevel !== undefined ? { thinkingLevel: spec.thinkingLevel } : {}),
+			}
 			: null;
 	}
 	return pins;
@@ -125,9 +125,9 @@ export function catalogSlots(): SlotPins {
 		const slot: EffectiveSlot | null = slots[name];
 		pins[name] = slot
 			? {
-					model: { provider: slot.provider, id: slot.id },
-					...(slot.thinkingLevel !== undefined ? { thinkingLevel: slot.thinkingLevel } : {}),
-				}
+				model: { provider: slot.provider, id: slot.id },
+				...(slot.thinkingLevel !== undefined ? { thinkingLevel: slot.thinkingLevel } : {}),
+			}
 			: null;
 	}
 	return pins;
@@ -300,9 +300,9 @@ export function clampModelsLevels(settings: ModelsSettings): ModelsSettings {
 		out[name] =
 			slot.thinkingLevel !== undefined
 				? {
-						model: slot.model,
-						thinkingLevel: clampLevelFor(slot.model.provider, slot.model.id, slot.thinkingLevel),
-					}
+					model: slot.model,
+					thinkingLevel: clampLevelFor(slot.model.provider, slot.model.id, slot.thinkingLevel),
+				}
 				: slot;
 	}
 	return out;

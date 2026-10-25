@@ -30,9 +30,11 @@ function withPayload(test: (fixture: {
 		write(path.join(STANDALONE, "src", "agent", "prompts", "teacher", "20-teaching.md"));
 		write(path.join(STANDALONE, "node_modules", "@earendil-works", "pi-ai", "dist", "providers", "github-copilot.js"));
 		write(path.join(STANDALONE, "node_modules", "@earendil-works", "pi-ai", "dist", "auth", "oauth", "github-copilot.js"));
-		test({ root, write, run: () => spawnSync(process.execPath, [path.join(root, "scripts", "build-server.mjs")], {
-			cwd: root, encoding: "utf8", timeout: 10_000,
-		}) });
+		test({
+			root, write, run: () => spawnSync(process.execPath, [path.join(root, "scripts", "build-server.mjs")], {
+				cwd: root, encoding: "utf8", timeout: 10_000,
+			})
+		});
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}

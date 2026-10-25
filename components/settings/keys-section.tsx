@@ -217,9 +217,8 @@ function KeyTableRow({
 				aria-expanded={expanded}
 				data-testid={`${testid}-row`}
 				onClick={() => !envOwned && onToggle()}
-				className={`flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left ${
-					envOwned ? "cursor-default" : "cursor-pointer transition-colors hover:bg-accent/50"
-				}`}
+				className={`flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left ${envOwned ? "cursor-default" : "cursor-pointer transition-colors hover:bg-accent/50"
+					}`}
 			>
 				<span className="font-ui text-xs text-foreground">{label}</span>
 				<span className="flex items-center gap-2">

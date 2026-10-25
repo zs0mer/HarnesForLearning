@@ -37,6 +37,9 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const { configurePasswordStore } = require("./password-store.cjs");
+
+configurePasswordStore(app, process.platform, process.env);
 
 // Mirrors SIDEBAR_AUTOCLOSE in components/sidebar.tsx — keep in sync (the
 // renderer owns the number; this is the IPC widen target).

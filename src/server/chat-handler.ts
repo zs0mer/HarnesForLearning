@@ -57,7 +57,7 @@ import {
 	type TurnInput,
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
-import type {CallUsage, SteerMessage} from "../core/contracts.ts";
+import type { CallUsage, SteerMessage } from "../core/contracts.ts";
 import { copilotModelAvailable, refreshCopilotConnection } from "../agent/copilot-bridge.ts";
 
 /**
@@ -400,30 +400,30 @@ export async function handleChatInput(
 		? buildAgent({ ...agentOpts, teaching })
 		: record.kind === "practice"
 			? createPracticeAgent(
-					{
+				{
+					chatId,
+					chatStore: stores.chatStore,
+					// TARGET VALIDATION (owner round 9): the practice tools read the
+					// WHOLE graph fresh per pose — targets validate against every
+					// proposition, not just the session's picks (pickless sessions
+					// and future graph-tools poses stay valid).
+					graphNodes: () => stores.graphStore.readNodes(),
+					// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
+					// (same runner/gating as the teacher's — research honestly
+					// absent when no engine is live) and the map readers behind
+					// the SAME settings gate as the prober's.
+					jobs: {
 						chatId,
-						chatStore: stores.chatStore,
-						// TARGET VALIDATION (owner round 9): the practice tools read the
-						// WHOLE graph fresh per pose — targets validate against every
-						// proposition, not just the session's picks (pickless sessions
-						// and future graph-tools poses stay valid).
-						graphNodes: () => stores.graphStore.readNodes(),
-						// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
-						// (same runner/gating as the teacher's — research honestly
-						// absent when no engine is live) and the map readers behind
-						// the SAME settings gate as the prober's.
-						jobs: {
-							chatId,
-							jobStore: stores.jobStore,
-							spawn: (job, input) => void jobRunner.runJob(job.id, input),
-							searchAvailable,
-						},
-						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
+						jobStore: stores.jobStore,
+						spawn: (job, input) => void jobRunner.runJob(job.id, input),
+						searchAvailable,
 					},
-					agentOpts,
-				)
+					...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
+				},
+				agentOpts,
+			)
 			: teaching
-			? createTeacherAgent(
+				? createTeacherAgent(
 					{
 						chatId,
 						chatStore: stores.chatStore,
@@ -435,7 +435,7 @@ export async function handleChatInput(
 					},
 					agentOpts,
 				)
-			: createProberAgent(
+				: createProberAgent(
 					{
 						chatId,
 						chatStore: stores.chatStore,

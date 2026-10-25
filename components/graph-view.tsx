@@ -355,15 +355,14 @@ export function GraphCostControl({ costs }: { costs: GraphCostSummary }) {
 				side="bottom"
 			>
 				<button
-				type="button"
-				aria-expanded={open}
-				onClick={() => setOpen((o) => !o)}
-				className={`rounded-lg px-2 py-1 text-xs tabular-nums transition-colors hover:bg-accent ${
-					open ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-				}`}
-			>
-				{graphUsageLabel(costs)}
-			</button>
+					type="button"
+					aria-expanded={open}
+					onClick={() => setOpen((o) => !o)}
+					className={`rounded-lg px-2 py-1 text-xs tabular-nums transition-colors hover:bg-accent ${open ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+						}`}
+				>
+					{graphUsageLabel(costs)}
+				</button>
 			</Hint>
 			{open && (
 				<div className="absolute right-0 top-full mt-2 max-h-[60vh] overflow-y-auto">
@@ -424,20 +423,20 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 			</div>
 			<div className="mt-2 flex flex-col gap-0.5 border-t pt-2">
 				{costs.runs.map((run) => (
-						<div key={run.startedAt} className="flex items-baseline justify-between gap-2 text-[11px]">
-							<span className="min-w-0 flex-1 truncate text-muted-foreground">
-								<span className="text-foreground/70">{timeAgo(run.startedAt)}</span>{" "}
-								{run.title}
-								{run.merged && (
-									<span className="text-muted-foreground">
-										{" "}
-										+{run.merged.nodes}n
-									</span>
-								)}
-							</span>
-							<span className="shrink-0 tabular-nums">{fmtRunCost(run.dollars, (run.subscriptionRuns ?? 0) > 0, run.copilotRuns, run.subscriptionRuns)}{run.dollars === null && run.subscriptionRuns === 1 ? " +1 unpriced" : ""}</span>
-						</div>
-					))}
+					<div key={run.startedAt} className="flex items-baseline justify-between gap-2 text-[11px]">
+						<span className="min-w-0 flex-1 truncate text-muted-foreground">
+							<span className="text-foreground/70">{timeAgo(run.startedAt)}</span>{" "}
+							{run.title}
+							{run.merged && (
+								<span className="text-muted-foreground">
+									{" "}
+									+{run.merged.nodes}n
+								</span>
+							)}
+						</span>
+						<span className="shrink-0 tabular-nums">{fmtRunCost(run.dollars, (run.subscriptionRuns ?? 0) > 0, run.copilotRuns, run.subscriptionRuns)}{run.dollars === null && run.subscriptionRuns === 1 ? " +1 unpriced" : ""}</span>
+					</div>
+				))}
 			</div>
 		</div>
 	);
@@ -471,15 +470,14 @@ function GraphSettingsControl({
 				side="bottom"
 			>
 				<button
-				type="button"
-				aria-expanded={open}
-				onClick={() => setOpen((o) => !o)}
-				className={`flex size-9 items-center justify-center rounded-xl border bg-card/85 shadow-lg backdrop-blur transition-colors hover:bg-accent ${
-					open ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-				}`}
-			>
-				<SettingsIcon className="size-4" />
-			</button>
+					type="button"
+					aria-expanded={open}
+					onClick={() => setOpen((o) => !o)}
+					className={`flex size-9 items-center justify-center rounded-xl border bg-card/85 shadow-lg backdrop-blur transition-colors hover:bg-accent ${open ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+						}`}
+				>
+					<SettingsIcon className="size-4" />
+				</button>
 			</Hint>
 			{open && (
 				// Viewport-capped + internally scrollable — the coverage
@@ -495,62 +493,62 @@ function GraphSettingsControl({
 				// distance from the panel's right border.
 				<div className="absolute right-0 top-full mt-2 flex max-h-[60vh] w-72 flex-col rounded-xl border bg-card/85 p-2.5 shadow-lg backdrop-blur">
 					<div className="flex flex-col gap-2 overflow-y-auto pr-2.5">
-							{/* Size/zoom/region sliders: LADDER-mapped 0-100, step 10 (11
+						{/* Size/zoom/region sliders: LADDER-mapped 0-100, step 10 (11
 							    stops, every DEFAULT dead-center at 50, every value a nice
 							    number — src/core/render-settings.ts). Physics keeps the
 							    fine-grained log sliders (step 5). */}
-							<SettingSlider
-								label="Node size"
-								min={0}
-								max={100}
-								step={10}
-								value={toLadderPosition(settings.nodeSize, NODE_SIZE_LADDER)}
-								display={sizeDisplay(settings.nodeSize)}
-								onChange={(p) =>
-									changeSettings((cur) => ({ ...cur, nodeSize: fromLadderPosition(p, NODE_SIZE_LADDER) }))}
-							/>
-							<SettingSlider
-								label="Edge width"
-								min={0}
-								max={100}
-								step={10}
-								value={toLadderPosition(settings.edgeWidth, EDGE_WIDTH_LADDER)}
-								display={sizeDisplay(settings.edgeWidth)}
-								onChange={(p) =>
-									changeSettings((cur) => ({ ...cur, edgeWidth: fromLadderPosition(p, EDGE_WIDTH_LADDER) }))}
-							/>
-							<SettingSlider
-								label="Arrowhead size"
-								min={0}
-								max={100}
-								step={10}
-								value={toLadderPosition(settings.arrowLength, ARROW_LENGTH_LADDER)}
-								display={sizeDisplay(settings.arrowLength)}
-								onChange={(p) =>
-									changeSettings((cur) => ({ ...cur, arrowLength: fromLadderPosition(p, ARROW_LENGTH_LADDER) }))}
-							/>
-							<SettingSlider
-								label="Label size"
-								min={0}
-								max={100}
-								step={10}
-								value={toLadderPosition(settings.labelSize, LABEL_SIZE_LADDER)}
-								display={sizeDisplay(settings.labelSize)}
-								onChange={(p) =>
-									changeSettings((cur) => ({ ...cur, labelSize: fromLadderPosition(p, LABEL_SIZE_LADDER) }))}
-							/>
-							{/* Display is absolute (ratio / 0.5): "1×" is the default, dead-center (owner, 2026-10-07). */}
-							<SettingSlider
-								label="Labels until zoom"
-								min={0}
-								max={100}
-								step={10}
-								value={toLadderPosition(settings.labelZoom, LABEL_ZOOM_LADDER)}
-								display={labelZoomDisplay(settings.labelZoom)}
-								onChange={(p) =>
-									changeSettings((cur) => ({ ...cur, labelZoom: fromLadderPosition(p, LABEL_ZOOM_LADDER) }))}
-							/>
-							{/* Regions: the blurred cluster tints. Sliders + a fixed-set
+						<SettingSlider
+							label="Node size"
+							min={0}
+							max={100}
+							step={10}
+							value={toLadderPosition(settings.nodeSize, NODE_SIZE_LADDER)}
+							display={sizeDisplay(settings.nodeSize)}
+							onChange={(p) =>
+								changeSettings((cur) => ({ ...cur, nodeSize: fromLadderPosition(p, NODE_SIZE_LADDER) }))}
+						/>
+						<SettingSlider
+							label="Edge width"
+							min={0}
+							max={100}
+							step={10}
+							value={toLadderPosition(settings.edgeWidth, EDGE_WIDTH_LADDER)}
+							display={sizeDisplay(settings.edgeWidth)}
+							onChange={(p) =>
+								changeSettings((cur) => ({ ...cur, edgeWidth: fromLadderPosition(p, EDGE_WIDTH_LADDER) }))}
+						/>
+						<SettingSlider
+							label="Arrowhead size"
+							min={0}
+							max={100}
+							step={10}
+							value={toLadderPosition(settings.arrowLength, ARROW_LENGTH_LADDER)}
+							display={sizeDisplay(settings.arrowLength)}
+							onChange={(p) =>
+								changeSettings((cur) => ({ ...cur, arrowLength: fromLadderPosition(p, ARROW_LENGTH_LADDER) }))}
+						/>
+						<SettingSlider
+							label="Label size"
+							min={0}
+							max={100}
+							step={10}
+							value={toLadderPosition(settings.labelSize, LABEL_SIZE_LADDER)}
+							display={sizeDisplay(settings.labelSize)}
+							onChange={(p) =>
+								changeSettings((cur) => ({ ...cur, labelSize: fromLadderPosition(p, LABEL_SIZE_LADDER) }))}
+						/>
+						{/* Display is absolute (ratio / 0.5): "1×" is the default, dead-center (owner, 2026-10-07). */}
+						<SettingSlider
+							label="Labels until zoom"
+							min={0}
+							max={100}
+							step={10}
+							value={toLadderPosition(settings.labelZoom, LABEL_ZOOM_LADDER)}
+							display={labelZoomDisplay(settings.labelZoom)}
+							onChange={(p) =>
+								changeSettings((cur) => ({ ...cur, labelZoom: fromLadderPosition(p, LABEL_ZOOM_LADDER) }))}
+						/>
+						{/* Regions: the blurred cluster tints. Sliders + a fixed-set
 						    dropdown for the bitmap resolution (it's a discrete
 						    choice, not a free number). Server-persisted like the
 						    sizes; every range end was sweep-validated on the real
@@ -571,7 +569,7 @@ function GraphSettingsControl({
 											...cur,
 											regions: { ...cur.regions, enabled: e.target.checked },
 										}))}
-										className="accent-primary"
+									className="accent-primary"
 								/>
 							</label>
 							<SettingSlider
@@ -878,18 +876,18 @@ export function GraphChromeRow({
 						action="find"
 						side="bottom"
 					>
-					<div className="relative">
-						<SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-						<input
-							ref={searchInputRef}
-							value={query}
-							onChange={(e) => onQuery(e.target.value)}
-							placeholder="Search nodes…"
-							aria-label="Search nodes"
-							spellCheck={false}
-							className="h-7 w-full rounded-lg border bg-background pl-8 text-xs outline-none placeholder:text-muted-foreground focus:border-ring"
-						/>
-					</div>
+						<div className="relative">
+							<SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+							<input
+								ref={searchInputRef}
+								value={query}
+								onChange={(e) => onQuery(e.target.value)}
+								placeholder="Search nodes…"
+								aria-label="Search nodes"
+								spellCheck={false}
+								className="h-7 w-full rounded-lg border bg-background pl-8 text-xs outline-none placeholder:text-muted-foreground focus:border-ring"
+							/>
+						</div>
 					</Hint>
 					{noMatch && (
 						<div className="px-1.5 pt-1 text-[11px] text-muted-foreground">No matching nodes.</div>
@@ -939,8 +937,8 @@ export function GraphChromeRow({
 						disabled={importing}
 						onClick={() => fileInputRef.current?.click()}
 						data-testid="import-notes"
-					className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
-				>
+						className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+					>
 						<UploadIcon className="size-3" />
 						{importing ? "Importing…" : "Import notes…"}
 					</button>
@@ -1140,7 +1138,7 @@ export function GraphView({
 				if ([...rowIdsRef.current].some((id) => !ids.has(id))) setRefreshTick((t) => t + 1);
 				rowIdsRef.current = ids;
 			})
-			.catch(() => {}); // status is cosmetic — never surface read errors
+			.catch(() => { }); // status is cosmetic — never surface read errors
 	}, []);
 	// PUSH (S7, 2026-10-02): the standing 2s poll is RETIRED — the
 	// extraction registry announces every phase transition and every
@@ -1177,7 +1175,7 @@ export function GraphView({
 		fetch("/api/graph/costs")
 			.then((res) => res.json() as Promise<GraphCostSummary>)
 			.then(setCosts)
-			.catch(() => {});
+			.catch(() => { });
 	}, []);
 	useEffect(() => {
 		refreshCosts();
@@ -1193,12 +1191,12 @@ export function GraphView({
 	}, [pipelineRuns, refreshCosts]);
 
 	/* Deletion refresh (wave 6 chunk A): the DELETE /api/chats/:id response
-	   carries the new graphRevision, and the sidebar (which owns the delete
-	   flow) announces it as lh:graph-revision. The status poll above can't
-	   see a deletion — no pipeline run ever disappears from the feed for
-	   it — so this event is the one seam. Refetch the snapshot and the
-	   costs on every announcement: deletions are rare, a redundant fetch
-	   is free. */
+		 carries the new graphRevision, and the sidebar (which owns the delete
+		 flow) announces it as lh:graph-revision. The status poll above can't
+		 see a deletion — no pipeline run ever disappears from the feed for
+		 it — so this event is the one seam. Refetch the snapshot and the
+		 costs on every announcement: deletions are rare, a redundant fetch
+		 is free. */
 	useEffect(() => {
 		const onRevision = () => {
 			setRefreshTick((t) => t + 1);
@@ -1209,17 +1207,17 @@ export function GraphView({
 	}, [refreshCosts]);
 
 	/* Live rename labels (rename-shuffle fix, 2026-09-23): a session
-	   rename anywhere (sidebar inline row, chat header) announces itself
-	   as lh:chat-renamed {id, title} — and the birth-session partition
-	   means that title IS the cluster label. The label update goes
-	   through the renderer's label-only channel (setClusterLabels): NO
-	   new snapshot object, NO setData, NO geometry rebuild — so the
-	   position ledger can't assert itself and a pending drag commit
-	   survives. The sessions map (the detail card's provenance line)
-	   patches in place; a tick bump re-renders the view so an open
-	   detail card reads the fresh title. Unlabeled clusters keep their
-	   hull-only silence — the null-label guard lives in the channel
-	   (applyClusterLabels): a rename can't reach a gone record. */
+		 rename anywhere (sidebar inline row, chat header) announces itself
+		 as lh:chat-renamed {id, title} — and the birth-session partition
+		 means that title IS the cluster label. The label update goes
+		 through the renderer's label-only channel (setClusterLabels): NO
+		 new snapshot object, NO setData, NO geometry rebuild — so the
+		 position ledger can't assert itself and a pending drag commit
+		 survives. The sessions map (the detail card's provenance line)
+		 patches in place; a tick bump re-renders the view so an open
+		 detail card reads the fresh title. Unlabeled clusters keep their
+		 hull-only silence — the null-label guard lives in the channel
+		 (applyClusterLabels): a rename can't reach a gone record. */
 	const [, setLabelTick] = useState(0);
 	useEffect(() => {
 		const onRenamed = (e: Event) => {
@@ -1594,49 +1592,49 @@ export function GraphView({
 			    rejected the two-row fold); in narrow windows the search is
 			    the flexible element and shrinks instead. */}
 			<div className="lh-no-drag lh-wco-floating absolute right-2 top-2 z-10 flex max-w-[calc(100%-5.5rem)] flex-col items-end gap-2">
-			{/* z-20 (2026-09-20): the row paints above the cost number below
+				{/* z-20 (2026-09-20): the row paints above the cost number below
 			    it — without this, the later-in-DOM cost control layered over
 			    the settings/coverage dropdowns (owner report), still hoverable
 			    and clickable on top of them. The row is a stacking context, so
 			    its open dropdowns cover the number; clicks land on the panel. */}
-			<div className="relative z-20 flex min-w-0 items-start gap-2">
-				{/* The actions row (empty-graph chrome wave, owner 2026-09-25):
+				<div className="relative z-20 flex min-w-0 items-start gap-2">
+					{/* The actions row (empty-graph chrome wave, owner 2026-09-25):
 				    Import Notes always — the empty graph's entry point; search +
 				    settings only when nodes exist, fading in on their mount. */}
-				<GraphChromeRow
-					isEmpty={isEmpty}
-					query={query}
-					onQuery={setQuery}
-					noMatch={snapshot !== null && visibleIds.size === 0 && query.trim() !== ""}
-					importing={importing}
-					searchInputRef={searchInputRef}
-					fileInputRef={fileInputRef}
-					onImportFiles={onImportFiles}
-					settings={settings}
-					changeSettings={changeSettings}
-					onOpenChains={() => setChainsOpen(true)}
-				/>
-			</div>
+					<GraphChromeRow
+						isEmpty={isEmpty}
+						query={query}
+						onQuery={setQuery}
+						noMatch={snapshot !== null && visibleIds.size === 0 && query.trim() !== ""}
+						importing={importing}
+						searchInputRef={searchInputRef}
+						fileInputRef={fileInputRef}
+						onImportFiles={onImportFiles}
+						settings={settings}
+						changeSettings={changeSettings}
+						onOpenChains={() => setChainsOpen(true)}
+					/>
+				</div>
 
-			<NotesImportErrors errors={notesImport.errors} />
-			{/* Top-right tail (owner, 2026-09-20): the pipeline cost number —
+				<NotesImportErrors errors={notesImport.errors} />
+				{/* Top-right tail (owner, 2026-09-20): the pipeline cost number —
 			    just a number, hover-highlighted, dropdown breakdown — then
 			    the running-pipeline pills under it. Lives BELOW the actions
 			    row so narrow windows can never push it over the composer
 			    the way the old bottom-left stack did; the whole top-right
 			    cluster is one column, right-aligned. */}
-			{costs && costs.runs.length > 0 && <GraphCostControl costs={costs} />}
-			{pipelineRuns.map((run) => (
-				<div
-					key={run.id}
-					className="flex items-center gap-2 rounded-full border bg-card/85 px-3 py-1.5 text-xs text-muted-foreground shadow-lg backdrop-blur"
-				>
-					<Loader2Icon className="size-3.5 shrink-0 animate-spin" />
-					<span className="capitalize">{run.phase}</span>
-					<span className="max-w-48 truncate text-foreground">{run.title}</span>
-					<span className="tabular-nums">{Math.max(0, Math.round((Date.now() - run.startedAt) / 1000))}s</span>
-				</div>
-			))}
+				{costs && costs.runs.length > 0 && <GraphCostControl costs={costs} />}
+				{pipelineRuns.map((run) => (
+					<div
+						key={run.id}
+						className="flex items-center gap-2 rounded-full border bg-card/85 px-3 py-1.5 text-xs text-muted-foreground shadow-lg backdrop-blur"
+					>
+						<Loader2Icon className="size-3.5 shrink-0 animate-spin" />
+						<span className="capitalize">{run.phase}</span>
+						<span className="max-w-48 truncate text-foreground">{run.title}</span>
+						<span className="tabular-nums">{Math.max(0, Math.round((Date.now() - run.startedAt) / 1000))}s</span>
+					</div>
+				))}
 			</div>
 
 			{selected && !isEmpty && (

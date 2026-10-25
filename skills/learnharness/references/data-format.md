@@ -12,6 +12,8 @@ Paths below are relative to the selected **data** directory:
 
 ```text
 chats/<session-id>.json    Full session: messages, optional plan, usage metadata
+memory/teaching-guide.md   Freeform teaching preferences and learner observations
+memory/knowledge-overview.md  Decimal topic assessments, certainty, and evidence IDs
 graph/nodes.jsonl          Proposition assertions; IDs can repeat
 graph/chains.jsonl         Reasoning-chain assertions; logical chains can repeat
 graph/sources.json        Imported-note source metadata, keyed by source ID
@@ -27,6 +29,32 @@ jobs/<job-id>.json        Background work records; delivered artifacts also appe
 to interpret learning history. `auth.json` is normally one directory above data;
 do not read it. Imported-note paths, research URLs, and artifact references are not
 automatically followed by the readers.
+
+## Learner memory is a third layer
+
+The full teaching guide and knowledge overview are auto-loaded for in-app agents.
+The external skill only reads them, using `scripts/memory.py read`; it never
+updates memory, generates a learner journal, or exports transcripts. These are
+revisable learner interpretations, not graph propositions or primary evidence.
+
+The overview's v1 metadata comment holds a revision and the teaching guide's
+SHA-256 digest, binding the document pair. The reader refuses a partial pair,
+digest mismatch, unknown version, or pending application transaction rather than
+recovering or migrating files. Reads are not a cross-file atomic snapshot.
+
+Each topic has a stable ID, name, decimal rating in [0,5], optional confidence in
+[0,100), optional notes, and evidence `{chatId, messageId}` pairs. Missing topic
+confidence means near-certain assessment; it is **not** missing quiz confidence.
+An absent topic is unassessed. Rating zero requires evidence of unawareness.
+The rubric progresses from unawareness (0), through recognition (1), exposure
+with some independent derivation (2), partial recall plus derivation (3), nearly
+complete recall/derivation (4), to mastery (5). Fractional ratings are valid.
+Graph coverage indicates taught/encountered content, not mastery at any rating.
+
+Follow memory evidence with `sessions.py read SESSION_ID --message-id MESSAGE_ID`
+(repeat the flag for multiple IDs). Selected messages retain original source
+indexes and related occurrence-bound calls/results; nonselected messages are
+explicit omissions. No summary replaces selected learner evidence.
 
 ## A session record
 

@@ -27,12 +27,16 @@ import { activeProblemOf } from "../../core/native-messages.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
+import { learnerHistoryTools, type LearnerHistoryContext } from "./learner-history.ts";
+import { rememberLearnerPreferenceTool } from "../tools.ts";
 
 
 /** The record-reading context the gates need (the plan-tools idiom). */
 export interface PracticeToolContext {
 	chatId: string;
 	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null };
+	/** Read-only history is available independently of the legacy graph gate. */
+	history?: LearnerHistoryContext;
 	/** The WHOLE-graph node list, read fresh per pose (owner round 9 — the
 	 *  mastery-trace contract): targets validate against every proposition,
 	 *  not just the session's picks, so pickless sessions and future
@@ -238,6 +242,8 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 	return healToolRecord({
 		problem: problemTool(gate, ctx.graphNodes),
 		conclude: concludeTool(gate),
+		remember_learner_preference: rememberLearnerPreferenceTool,
+		...(ctx.history ? learnerHistoryTools(ctx.history) : {}),
 		read: readTool,
 		ls: lsTool,
 		find: findTool,

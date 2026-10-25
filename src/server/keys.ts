@@ -55,6 +55,19 @@ import {
 import { authStore } from "../store/auth.ts";
 import { chatGPTConnected } from "../agent/chatgpt-bridge.ts";
 
+const changeKey = Symbol.for("learnharness.keys.listeners");
+const changeGlobals = globalThis as typeof globalThis & { [changeKey]?: Set<() => void> };
+const changeListeners = changeGlobals[changeKey] ??= new Set<() => void>();
+export function onKeysChange(listener: () => void): () => void {
+	changeListeners.add(listener);
+	return () => { changeListeners.delete(listener); };
+}
+function keysChanged(): void {
+	for (const listener of changeListeners) {
+		try { listener(); } catch (error) { console.error("[keys] change listener failed:", error); }
+	}
+}
+
 // The once-per-process boot record — globalThis anchor (HMR re-imports the
 // module; the snapshot must not re-run and misread fill-gapped vars as real
 // env). Same pattern as globalThis.__lhExtractionRuns.
@@ -225,6 +238,7 @@ export function saveKey(id: string, value: string): { ok: true; status: AuthKeyS
 		record.fillGap.add(id);
 	}
 	// validateKeyShape guarantees catalog membership, so the row exists.
+	keysChanged();
 	return { ok: true, status: keyStatuses().find((s) => s.id === id)! };
 }
 
@@ -240,6 +254,7 @@ export function deleteKey(id: string): AuthKeyStatus {
 		delete process.env[id];
 		record.fillGap.delete(id);
 	}
+	keysChanged();
 	return keyStatuses().find((s) => s.id === id)!;
 }
 

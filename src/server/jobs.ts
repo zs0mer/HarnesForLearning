@@ -59,6 +59,7 @@ import {
 	buildAbortSteer,
 	buildSubagentSteer,
 	isSubagentFailure,
+	isDispatchJobKind,
 	steerDelivered,
 	type JobRecord,
 	type SteerMessage,
@@ -95,6 +96,7 @@ interface QueuedSteer {
 interface WakeState {
 	turnRunner?: TurnRunner;
 	respawn?: JobRespawn;
+	memoryJobs?: MemoryJobHooks;
 	/** chatId → steers awaiting delivery, in arrival order. The single
 	 *  delivery registry (Wave C: the agent's own follow-up queue is a
 	 *  per-run VEHICLE, not the registry — settlement reconciles here). */
@@ -134,6 +136,15 @@ export function setTurnRunner(run: TurnRunner): void {
 /** chat-handler wires this at module init: its job runner's runJob. */
 export function setJobRespawn(respawn: JobRespawn): void {
 	state().respawn = respawn;
+}
+
+/** Inject the coordinator, never import the composition singleton here. */
+export interface MemoryJobHooks {
+	recover(): Promise<void>;
+	cancelJob(jobId: string): boolean;
+}
+export function setMemoryJobHooks(hooks: MemoryJobHooks | undefined): void {
+	state().memoryJobs = hooks;
 }
 
 const POLL_MS = 400;
@@ -196,6 +207,9 @@ function failSteer(steer: SteerMessage, err: Error): void {
  *  Resolves when the wake turn has completed; rejects when delivery fails
  *  unrecoverably. Never rejects for queueing itself. */
 export function deliverJobResult(steer: SteerMessage): Promise<void> {
+	const id = jobIdOf(steer);
+	if ((steer.details as { kind?: string } | undefined)?.kind === "memory" ||
+		(id && stores.jobStore.getJob(id)?.kind === "memory")) return Promise.resolve();
 	return new Promise<void>((resolve, reject) => {
 		const s = state();
 		const chatId = chatIdOf(steer);
@@ -394,6 +408,12 @@ export function abortJob(jobId: string): AbortOutcome {
 	const job = stores.jobStore.getJob(jobId);
 	if (!job) return { ok: false, reason: "not_found" };
 	if (job.status !== "running") return { ok: false, reason: "not_running" };
+	if (job.kind === "memory") {
+		state().memoryJobs?.cancelJob(jobId);
+		fireJobAbort(jobId);
+		stores.jobStore.updateJob(jobId, { status: "error", error: "Aborted by learner", activity: "aborted" });
+		return { ok: true };
+	}
 
 	fireJobAbort(jobId); // no-op when the loop already returned (delivering)
 
@@ -641,7 +661,7 @@ state().stopConnectionWatch = onChatGPTChange(() => {
 /** Flip the job to its final status now that the lesson has resumed. */
 function finalizeJob(jobId: string): void {
 	const job = stores.jobStore.getJob(jobId);
-	if (!job || job.status !== "running") return;
+	if (!job || job.status !== "running" || !isDispatchJobKind(job.kind)) return;
 	const result = job.result;
 	const failed = result ? isSubagentFailure(job.kind, result as never) : true;
 	stores.jobStore.updateJob(jobId, {
@@ -711,8 +731,10 @@ export function recoverStaleJobs(): void {
 	if (now - s.lastSweepAt < SWEEP_THROTTLE_MS) return;
 	s.lastSweepAt = now;
 	try {
+		void s.memoryJobs?.recover().catch((error) => console.error("[jobs] memory recovery failed:", error));
 		for (const chat of stores.chatStore.listChats()) {
 			for (const job of stores.jobStore.listJobs(chat.id)) {
+				if (!isDispatchJobKind(job.kind)) continue;
 				if (job.status !== "running") continue;
 				if (isJobLive(job.id)) continue; // provably executing here — never re-run beside it
 				if (!stores.chatStore.getChat(job.chatId)) continue;

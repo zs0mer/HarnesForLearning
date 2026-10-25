@@ -1,6 +1,13 @@
 import type { CopilotStatus } from "../core/contracts/copilot.ts";
 
 const key = Symbol.for("lh.copilot.bridge");
+const listenersKey = Symbol.for("lh.copilot.listeners");
+const listenerGlobals = globalThis as typeof globalThis & { [listenersKey]?: Set<() => void> };
+const listeners = listenerGlobals[listenersKey] ??= new Set<() => void>();
+export function onCopilotChange(listener: () => void): () => void {
+  listeners.add(listener); return () => { listeners.delete(listener); };
+}
+function notifyChange() { for (const listener of listeners) listener(); }
 const unavailable = (): CopilotStatus => ({ available: false, connected: false, pending: false, revision: 0, modelIds: [], device: null, error: null });
 interface Pending { op: string; resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
 interface State { status: CopilotStatus; sequence: number; pending: Map<string, Pending>; controllers: Set<AbortController> }
@@ -17,6 +24,7 @@ function state(): State {
     process.on("disconnect", () => {
       s.status = unavailable(); for (const c of s.controllers) c.abort();
       for (const call of s.pending.values()) { clearTimeout(call.timer); call.reject(new Error("GitHub Copilot desktop connection closed.")); } s.pending.clear();
+      notifyChange();
     });
   }
   return global[key];
@@ -24,7 +32,9 @@ function state(): State {
 function accept(s: State, value: CopilotStatus) {
   if (!Number.isSafeInteger(value.revision) || value.revision < s.status.revision || !Array.isArray(value.modelIds) || !value.modelIds.every((id) => typeof id === "string")) return;
   if (value.revision !== s.status.revision || !value.connected) for (const c of s.controllers) c.abort();
+  const changed = JSON.stringify(s.status) !== JSON.stringify({ ...value, device: null });
   s.status = { ...value, device: null }; // the server never needs the login challenge
+  if (changed) notifyChange();
 }
 function request<T>(op: "status" | "lease", fields: Record<string, unknown> = {}): Promise<T> {
   const s = state();

@@ -4,7 +4,8 @@ import { deleteChatTraces, type ChatDeleteMode, type ChatDeletionStats } from ".
 import { titleFromPrompt } from "../core/contracts.ts";
 import { graphRevision } from "./graph.ts";
 import { stores } from "./stores.ts";
-import { isTurnRunning } from "./turn-liveness.ts";
+import { beginSessionDeletion, endSessionDeletion, isTurnRunning } from "./turn-liveness.ts";
+import { learnerMemoryCoordinator } from "./learner-memory-runtime.ts";
 
 /**
  * Server-side chat entries for the transport layer (app/api/chats*,
@@ -18,7 +19,11 @@ import { isTurnRunning } from "./turn-liveness.ts";
  * argument.
  */
 
-export const { createChat, getChat, listChats } = stores.chatStore;
+export const { getChat, listChats } = stores.chatStore;
+export const createChat: typeof stores.chatStore.createChat = (...args) => {
+	learnerMemoryCoordinator.activate();
+	return stores.chatStore.createChat(...args);
+};
 export { titleFromPrompt };
 export type { ChatDeleteMode, ChatDeletionStats } from "../core/graph-deletion.ts";
 
@@ -78,7 +83,7 @@ export async function deleteChatSession(chatId: string, mode: ChatDeleteMode): P
 			jobIds: [],
 		};
 	}
-	const runningJobs = stores.jobStore.listJobs(chatId).filter((job) => job.status === "running");
+	const runningJobs = stores.jobStore.listJobs(chatId).filter((job) => job.status === "running" && job.kind !== "memory");
 	if (runningJobs.length > 0) {
 		return {
 			ok: false,
@@ -88,6 +93,10 @@ export async function deleteChatSession(chatId: string, mode: ChatDeleteMode): P
 			jobIds: runningJobs.map((job) => job.id),
 		};
 	}
+	if (!beginSessionDeletion(chatId)) {
+		return { ok: false, status: 409, code: "turn_in_flight", error: "The session is busy — try again in a moment", jobIds: [] };
+	}
+	try {
 	if (extractionStatuses().some((run) => run.chatId === chatId)) {
 		abortExtraction(chatId); // true cancellation — spend stops, nothing merges
 		const deadline = Date.now() + WIND_DOWN_TIMEOUT_MS;
@@ -103,6 +112,21 @@ export async function deleteChatSession(chatId: string, mode: ChatDeleteMode): P
 			await new Promise((resolve) => setTimeout(resolve, WIND_DOWN_POLL_MS));
 		}
 	}
+	// Memory jobs never steer into the chat. Cancel even deferred work and
+	// remove evidence BEFORE the record/jobs disappear. The deletion claim
+	// prevents a turn (including answers-without-turn) during this await.
+	await learnerMemoryCoordinator.deleteSession(chatId);
+	if (!stores.chatStore.getChat(chatId)) {
+		return { ok: false, status: 404, code: "not_found", error: "No such session" };
+	}
+	const racedJobs = stores.jobStore.listJobs(chatId).filter((job) => job.status === "running" && job.kind !== "memory");
+	if (isTurnRunning(chatId) || racedJobs.length) {
+		return { ok: false, status: 409, code: racedJobs.length ? "jobs_running" : "turn_in_flight", error: "The session became busy — try again when work finishes", jobIds: racedJobs.map((job) => job.id) };
+	}
+	if (extractionStatuses().some((run) => run.chatId === chatId)) {
+		abortExtraction(chatId);
+		return { ok: false, status: 503, code: "extraction_winding_down", error: "The session's extraction is still winding down — try again in a moment" };
+	}
 
 	// THE SYNC BLOCK — no awaits below (see the doc comment). Order:
 	// ledgers → jobs → the chat record.
@@ -110,6 +134,10 @@ export async function deleteChatSession(chatId: string, mode: ChatDeleteMode): P
 	const jobsRemoved = stores.jobStore.deleteJobsForChat(chatId);
 	stores.chatStore.deleteChat(chatId);
 	return { ok: true, mode, stats, jobsRemoved, graphRevision: graphRevision() };
+	} finally {
+		try { await learnerMemoryCoordinator.cancelDeletion(chatId); }
+		finally { endSessionDeletion(chatId); }
+	}
 }
 
 /** One session's coverage read (extraction-UX redesign, owner dispatch

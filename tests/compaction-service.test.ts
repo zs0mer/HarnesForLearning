@@ -32,7 +32,7 @@ const {
 } = await import("../src/server/compaction.ts");
 import type { CompactionDeps } from "../src/server/compaction.ts";
 const { subscribe } = await import("../src/core/events.ts");
-const { activeCompactionOf, newUserMessage, COMPACTED_HISTORY_HEADER } = await import("../src/core/index.ts");
+const { activeCompactionOf, newUserMessage, newCompactionMarker, estimateTokens, toLlmMessages, COMPACTED_HISTORY_HEADER } = await import("../src/core/index.ts");
 import type { LhMessage } from "../src/core/index.ts";
 
 after(() => {
@@ -42,6 +42,15 @@ after(() => {
 // ── fixtures ────────────────────────────────────────────────────────────────
 
 const big = (text: string, kb = 100): LhMessage => newUserMessage(`${text}: ${"x".repeat(kb * 1024)}`);
+
+const usageAssistant = (tokens: number): LhMessage => ({
+	id: crypto.randomUUID(),
+	role: "assistant",
+	content: [{ type: "text", text: "Done" }],
+	stopReason: "stop",
+	usage: { input: tokens - 10, output: 10, cacheRead: 0, cacheWrite: 0, totalTokens: tokens, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+	timestamp: 1,
+}) as LhMessage;
 
 /** A chat whose record projects far over any test threshold. */
 function overThresholdChat(label: string): string {
@@ -74,6 +83,42 @@ const depsOf = (chatId: string, thresholdTokens: number): CompactionDeps => ({
 // ── the laws ────────────────────────────────────────────────────────────────
 
 describe("the compaction service", () => {
+	it("preserves provider accounting and estimates only the tail plus fresh dynamic memory", () => {
+		const messages = [big("already counted"), usageAssistant(30_000), newUserMessage("x".repeat(4_000))];
+		assert.equal(projectedContextTokens(messages, 90_000), 31_000, "static prompt is already in provider usage");
+		assert.equal(projectedContextTokens(messages, 90_000, 2_000), 33_000);
+		assert.equal(projectedContextTokens(messages, 90_000, 12_000), 43_000, "memory can grow independently of the transcript");
+		assert.equal(projectedContextTokens(messages, 90_000, 500), 31_500, "no sticky or guessed memory baseline");
+	});
+
+	it("counts static and dynamic prompts once without an anchor, including after a cut", () => {
+		const kept = newUserMessage("kept tail");
+		assert.equal(projectedContextTokens([kept], 100, 200), estimateTokens([kept]) + 300);
+		const marker = newCompactionMarker("short summary", { firstKeptMessageId: kept.id, tokensBefore: 500_000, at: "2026-10-25" });
+		const messages = [big("dropped"), usageAssistant(500_000), kept, marker];
+		const projected = estimateTokens(toLlmMessages(messages) as LhMessage[]);
+		assert.equal(projectedContextTokens(messages, 100, 200), projected + 300, "pre-cut usage and dropped history are ignored");
+		assert.equal(projectedContextTokens(messages, 100), projected + 100, "legacy callers retain their fallback");
+	});
+
+	for (const entrypoint of ["gate", "kick"] as const) {
+		it(`${entrypoint}: dynamic memory growth crosses an unchanged usage anchor and reaches marker provenance`, async () => {
+			const chatId = overThresholdChat(`compact: dynamic ${entrypoint}`);
+			chatStore.saveMessages(chatId, [...chatStore.getChat(chatId)!.messages, usageAssistant(30_000)]);
+			const before = summarizeCalls;
+			const run = async (dynamicPromptTokens: number) => {
+				const deps = { ...depsOf(chatId, 40_000), dynamicPromptTokens };
+				if (entrypoint === "gate") await ensureCompacted(deps, chatId);
+				else { kickCompaction(() => deps, chatId); await awaitCompaction(chatId); }
+			};
+			await run(1_000);
+			assert.equal(summarizeCalls, before);
+			await run(15_000);
+			assert.equal(summarizeCalls, before + 1);
+			assert.equal(activeCompactionOf(chatStore.getChat(chatId)!.messages)!.details.tokensBefore, 45_000);
+		});
+	}
+
 	it("background eligibility skips both entrypoints without writes, but still awaits an existing structural run", async () => {
 		const chatId = overThresholdChat("compact: consent off");
 		const before = summarizeCalls;

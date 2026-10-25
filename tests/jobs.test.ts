@@ -56,6 +56,7 @@ import {
 	recoverStaleJobs,
 	registerLiveAgent,
 	setJobRespawn,
+	setMemoryJobHooks,
 	setTurnRunner,
 	settleSteers,
 	steerLiveChat,
@@ -148,6 +149,7 @@ afterEach(() => {
 	// Late wakes from a prior test must be inert: a no-op respawn can't
 	// increment anyone's counter, a no-op runner can't spawn real work.
 	setJobRespawn(() => {});
+	setMemoryJobHooks(undefined);
 	setTurnRunner(async () => 200);
 });
 
@@ -1601,6 +1603,58 @@ describe("abort (src/server/jobs.ts abortJob)", () => {
 // beside itself); without one it is a process-death orphan and recovers at
 // once. The old 15-minute STALE_JOB_MS heuristic is gone — these tests prove
 // immediacy by running the sweep on FRESH records.
+
+describe("operational memory jobs never use dispatch delivery", () => {
+	it("runner ignores memory descriptors without touching engines, results or delivery", async () => {
+		const chat = chatStore.createChat("Test: operational memory"); trackChat(chat.id);
+		const job = jobStore.createJob({ kind: "memory", chatId: chat.id, toolCallId: "memory-test" }); trackJob(job.id);
+		jobStore.updateJob(job.id, { result: { version: 1, state: "queued" } });
+		const before = jobStore.getJob(job.id);
+		const runner = createJobRunner({ chatStore, jobStore,
+			deliver: async () => { assert.fail("memory must not deliver"); },
+			engineFor: () => { assert.fail("memory must not pick a dispatch engine"); } });
+		await runner.runJob(job.id);
+		assert.deepEqual(jobStore.getJob(job.id), before);
+		assert.throws(() => buildSubagentSteer(job, {} as ResearchResult), /cannot steer/);
+		assert.throws(() => buildAbortSteer(job), /cannot steer/);
+	});
+
+	it("recovery delegates to memory hook and never redelivers operational descriptors", async () => {
+		const chat = chatStore.createChat("Test: memory recovery"); trackChat(chat.id);
+		const job = jobStore.createJob({ kind: "memory", chatId: chat.id, toolCallId: "memory-recover" }); trackJob(job.id);
+		jobStore.updateJob(job.id, { result: { version: 1, state: "committing" } });
+		const before = jobStore.getJob(job.id);
+		let recovered = 0;
+		setMemoryJobHooks({ recover: async () => { recovered++; }, cancelJob: () => false });
+		setJobRespawn((id) => { assert.notEqual(id, job.id); });
+		setTurnRunner(async (id) => { assert.notEqual(id, chat.id); return 200; });
+		const g = globalThis as { __lhWakePipeline?: { lastSweepAt: number } };
+		if (g.__lhWakePipeline) g.__lhWakePipeline.lastSweepAt = 0;
+		recoverStaleJobs();
+		assert.equal(recovered, 1);
+		assert.deepEqual(jobStore.getJob(job.id), before);
+		const forged = { id: `steer_${job.id}`, role: "custom", customType: "subagent-steer", content: "operational descriptor", display: true, details: { jobId: job.id, kind: "memory" }, timestamp: 1 } as SteerMessage;
+		await deliverJobResult(forged);
+		noteSteerVisible(forged);
+		assert.deepEqual(jobStore.getJob(job.id), before);
+	});
+
+	it("abort cancels memory spend without a teacher wake, even without coordinator wiring", async () => {
+		for (const wired of [false, true]) {
+			const chat = chatStore.createChat("Test: memory abort"); trackChat(chat.id);
+			const job = jobStore.createJob({ kind: "memory", chatId: chat.id, toolCallId: "memory-abort" }); trackJob(job.id);
+			const controller = new AbortController(); registerJobAbort(job.id, controller);
+			let cancelled = 0;
+			setMemoryJobHooks(wired ? { recover: async () => {}, cancelJob: (id) => { assert.equal(id, job.id); cancelled++; return true; } } : undefined);
+			setTurnRunner(async () => { assert.fail("memory abort must not wake teacher"); });
+			assert.deepEqual(abortJob(job.id), { ok: true });
+			assert.equal(controller.signal.aborted, true);
+			assert.equal(cancelled, wired ? 1 : 0);
+			assert.equal(jobStore.getJob(job.id)!.status, "error");
+			assert.equal(chatStore.getChat(chat.id)!.messages.length, 0);
+		}
+	});
+});
 
 describe("stale-job recovery sweep (liveness-gated)", () => {
 	/** Reset the sweep's 30s throttle — tests fire it directly, repeatedly. */

@@ -10,13 +10,18 @@ import { chatStore } from "../store/chats.ts";
 import { graphStore } from "../store/graph.ts";
 import { jobStore } from "../store/jobs.ts";
 import { settingsStore } from "../store/settings.ts";
+import path from "node:path";
+import { PATHS } from "../../config.ts";
+import { createLearnerMemoryStore } from "../store/learner-memory.ts";
 import { resolveSettings, type EffectiveSettings } from "../core/settings-resolution.ts";
+export const memoryDirectory = path.join(PATHS.data, "memory");
 /** The wired adapters. Satisfies core/graph.ts's GraphDeps structurally. */
 export const stores = {
 	chatStore,
 	graphStore,
 	jobStore,
 	settingsStore,
+	learnerMemoryStore: createLearnerMemoryStore(memoryDirectory),
 };
 
 export type Stores = typeof stores;

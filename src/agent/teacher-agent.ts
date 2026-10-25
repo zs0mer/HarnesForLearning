@@ -8,6 +8,7 @@ import { APP_IDENTITY, piEngineFor, type PiEngine } from "./models.ts";
 import { effectivePromptSegments } from "./prompt-segments.ts";
 import {
 	askUserQuestionTool,
+	rememberLearnerPreferenceTool,
 	createProberTools,
 	createTeacherTools,
 	type ProbeDoneContext,
@@ -20,6 +21,7 @@ import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
 import { toLlmMessages, nativeInputCause } from "../core/native-messages.ts";
 import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
+import { formatLearnerMemory, type LearnerMemorySnapshot } from "../core/learner-memory.ts";
 
 /**
  * The two teaching-side agents (docs/probe-teach-split.md): the PROBER and
@@ -96,6 +98,8 @@ export type StepUsageCollector = (usage: Usage) => void;
 
 /** Per-request construction options (the handler wires all of these). */
 export interface AgentBuildOptions {
+	/** Fresh per-request memory; appended after the cached static instructions. */
+	learnerMemory?: LearnerMemorySnapshot;
 	/** Model + stream function — tests inject a scripted faux engine. */
 	engine?: PiEngine;
 	callPurpose?: { background: boolean };
@@ -174,9 +178,12 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// ("practice" is not a ModelRole) honest about that.
 	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
 	const stopper = makeQuestionStopper();
-	const systemPrompt = opts.promptSwitches
+	const staticInstructions = opts.promptSwitches
 		? composeInstructions(kind, opts.promptSwitches)
 		: composedInstructions[kind]!;
+	const systemPrompt = opts.learnerMemory
+		? `${staticInstructions}\n\n---\n\n${formatLearnerMemory(opts.learnerMemory)}`
+		: staticInstructions;
 	// Debug recorder (owner, 2026-10-04): raw provider events when
 	// LH_PROVIDER_EVENTS=1 and the caller handed a chatId; undefined is
 	// the normal no-observer path (tests, env-off).
@@ -303,6 +310,7 @@ export function bareQuestionTools(): Record<string, AgentTool<any>> {
 	return healToolRecord({
 		quiz,
 		ask_user_question: askUserQuestionTool,
+		remember_learner_preference: rememberLearnerPreferenceTool,
 	});
 }
 

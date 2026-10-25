@@ -4,7 +4,7 @@ import { useContext } from "react";
 import { CheckIcon, SettingsIcon, XIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
-import { isModelsRefusal, isProviderKeyRefusal, type JobKind, type JobRecord } from "@/src/core";
+import { isModelsRefusal, isProviderKeyRefusal, type DispatchJobKind, type JobRecord } from "@/src/core";
 import { BrailleSpinner } from "@/components/braille-spinner";
 
 /**
@@ -19,14 +19,14 @@ import { BrailleSpinner } from "@/components/braille-spinner";
  *                 itself arrives in the steer message right below, so the
  *                 box must not duplicate it.
  */
-const KIND_LABEL: Record<JobKind, string> = {
+const KIND_LABEL: Record<DispatchJobKind, string> = {
 	research: "Research agent",
 	demo: "Demo agent",
 	visual: "Figure agent",
 	pdf: "PDF reader",
 };
 
-export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: JobKind }) {
+export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: DispatchJobKind }) {
 	const jobs = useContext(JobsContext);
 	const job = jobs.find((j) => j.toolCallId === toolCallId) ?? null;
 	const label = KIND_LABEL[kind];

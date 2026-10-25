@@ -8,7 +8,7 @@
  * awaits, so they are atomic within the single-threaded event loop.
  */
 
-import * as fs from "node:fs";
+import fs from "node:fs";
 import * as path from "node:path";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
@@ -22,6 +22,27 @@ const JOBS_DIR = path.join(PATHS.data, "jobs");
 function jobFile(id: string): string {
 	if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`Invalid job id: ${id}`);
 	return path.join(JOBS_DIR, `${id}.json`);
+}
+
+/** Write-ahead memory candidates must survive before their memory commit.
+ * Never truncate the previous record; announce only after durable replacement.
+ * Like the encrypted store, Windows still syncs files but skips directory sync. */
+function persistJob(record: JobRecord): void {
+	fs.mkdirSync(JOBS_DIR, { recursive: true });
+	const destination = jobFile(record.id);
+	const temporary = `${destination}.${crypto.randomUUID()}.tmp`;
+	try {
+		const fd = fs.openSync(temporary, "wx", 0o600);
+		try {
+			fs.writeFileSync(fd, JSON.stringify(record, null, "\t"), "utf8");
+			fs.fsyncSync(fd);
+		} finally { fs.closeSync(fd); }
+		fs.renameSync(temporary, destination);
+		if (process.platform !== "win32") {
+			const directory = fs.openSync(JOBS_DIR, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY);
+			try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
+		}
+	} finally { fs.rmSync(temporary, { force: true }); }
 }
 
 /** Writes announce on the events channel AFTER the write lands (the
@@ -40,8 +61,7 @@ function createJob(init: CreateJobInit): JobRecord {
 		createdAt: now,
 		updatedAt: now,
 	};
-	fs.mkdirSync(JOBS_DIR, { recursive: true });
-	fs.writeFileSync(jobFile(record.id), JSON.stringify(record, null, "\t"), "utf-8");
+	persistJob(record);
 	emit("jobs-changed", { chatId: init.chatId });
 	return record;
 }
@@ -61,7 +81,7 @@ function updateJob(id: string, patch: JobPatch): JobRecord | null {
 	const record = getJob(id);
 	if (!record) return null;
 	const next: JobRecord = { ...record, ...patch, updatedAt: patch.updatedAt ?? new Date().toISOString() };
-	fs.writeFileSync(jobFile(id), JSON.stringify(next, null, "\t"), "utf-8");
+	persistJob(next);
 	// EVERY write, not just status flips: progress-line updates must reach
 	// the dispatch cards (the view debounces the fetch bursts). A missing id
 	// wrote nothing and stays silent.

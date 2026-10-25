@@ -25,6 +25,7 @@ import { findTool } from "./tools/find.ts";
 import { grepTool } from "./tools/grep.ts";
 import { healToolRecord } from "./tools/heal.ts";
 import type { GraphStore } from "../core/ports.ts";
+import { learnerHistoryTools, type LearnerHistoryContext } from "./tools/learner-history.ts";
 
 export { jobTools };
 export type { ProbeDoneContext } from "./tools/probe.ts";
@@ -92,6 +93,24 @@ export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 		if (problems.length > 0) return invalidInputResult("ask_user_question", problems);
 		return questionResult();
 	},
+};
+
+const learnerPreferenceInput = Type.Object({
+	preference: Type.String({
+		minLength: 1,
+		description: "The teaching preference explicitly expressed by the learner, faithfully recorded without inferred additions.",
+	}),
+});
+
+/** A normal tool-result milestone, persisted with the turn for memory updates.
+ * No direct memory-store write or special question/termination semantics. */
+export const rememberLearnerPreferenceTool: AgentTool<typeof learnerPreferenceInput> = {
+	name: "remember_learner_preference",
+	label: "remember_learner_preference",
+	description: "Record a teaching preference only when the learner explicitly expresses it. Do not infer preferences from behavior or call on every turn. The normal successful tool result marks the preference for the learner-memory updater.",
+	parameters: learnerPreferenceInput,
+	executionMode: "sequential",
+	execute: serverExecute("remember_learner_preference", learnerPreferenceInput, async () => ({ ok: true })),
 };
 
 // ─── the question tools ───────────────────────────────────────────────────────
@@ -264,6 +283,8 @@ export const probeExplainTool: AgentTool<typeof explainInputBase> = {
  *  ProbeDoneContext) PLUS the job-dispatch wiring, since the owner ruling
  *  (2026-09-20) puts research + pdf in the probe phase's registry too. */
 export interface ProberToolContext extends ProbeDoneContext {
+	/** Read-only learner history, independent of the legacy graph-tool gate. */
+	history?: LearnerHistoryContext;
 	/** Creates the job record (deduped by toolCallId). */
 	jobStore: JobStore;
 	/** Fire the background runner for a freshly created job. */
@@ -319,6 +340,8 @@ export function createProberTools(
 			{
 				...quizzing,
 				ask_user_question: askUserQuestionTool,
+				remember_learner_preference: rememberLearnerPreferenceTool,
+				...(ctx.history ? learnerHistoryTools(ctx.history) : {}),
 				// The learner-filesystem set is always-on (user-decided 2026-09,
 				// sources v1): the prober inspects and LOCATES learner-referenced
 				// files while assessing the edge. Read-only by construction.
@@ -391,6 +414,8 @@ export function teachQuizToolFor(ctx: Pick<PlanToolContext, "chatId" | "chatStor
 }
 
 export interface TeacherToolContext extends PlanToolContext {
+	/** Read-only learner history, independent of legacy graph-tool settings. */
+	history?: LearnerHistoryContext;
 	/** Job-tool wiring (sub-agent dispatch): the job store + the runner's
 	 *  spawn seam. The composition root injects both. */
 	jobStore: JobStore;
@@ -449,6 +474,8 @@ export function createTeacherTools(
 			{
 			...quizzing,
 			ask_user_question: askUserQuestionTool,
+			remember_learner_preference: rememberLearnerPreferenceTool,
+			...(ctx.history ? learnerHistoryTools(ctx.history) : {}),
 			// The learner-filesystem set is always-on (user-decided 2026-09,
 			// sources v1): the teacher locates and reads learner-referenced
 			// files on its own terms — nothing auto-injects. Read-only by

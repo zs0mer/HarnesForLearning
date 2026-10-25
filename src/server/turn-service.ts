@@ -54,9 +54,21 @@ export function persistTurn(
 	turnMessages: readonly AgentMessage[],
 	isAborted: boolean,
 ): LhMessage[] {
+	return persistTurnResult(chatStore, chatId, baseCount, turnMessages, isAborted).messages;
+}
+
+/** Explicit durability signal for orchestration. An empty successful turn is
+ * distinct from a failed save or a session that disappeared. */
+export function persistTurnResult(
+	chatStore: ChatStore,
+	chatId: string,
+	baseCount: number,
+	turnMessages: readonly AgentMessage[],
+	isAborted: boolean,
+): { persisted: boolean; messages: LhMessage[] } {
 	try {
 		const record = chatStore.getChat(chatId);
-		if (!record) return [];
+		if (!record) return { persisted: false, messages: [] };
 		const stamped: LhMessage[] = [];
 		for (const m of turnMessages.slice(baseCount)) {
 			const message = m as LhMessage;
@@ -76,10 +88,10 @@ export function persistTurn(
 			...stamped,
 		]);
 		chatStore.saveMessages(chatId, [...record.messages, ...stamped, ...blocks]);
-		return stamped;
+		return { persisted: true, messages: stamped };
 	} catch (err) {
 		console.error(`[chat ${chatId}] persist failed:`, err, { isAborted });
-		return [];
+		return { persisted: false, messages: [] };
 	}
 }
 

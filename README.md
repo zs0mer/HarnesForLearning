@@ -38,6 +38,17 @@ What you are taught accumulates as propositions and reasoning chains: individual
 
 Future teaching sessions can read the graph instead of starting from scratch. Practice sessions can draw their material from it. It stores the ideas and their connections, not ratings of your ability.
 
+Two additional Markdown documents under the data directory's `memory/` folder carry your learner profile:
+
+- **Teaching guide:** how to teach you, including explicit preferences and evidence-grounded adjustments.
+- **Knowledge overview:** broad topics rated on a decimal 0–5 scale: 0 unaware, 1 aware of its existence, 2 encountered it and can derive parts, 3 can recall parts and derive most, 4 can recall or derive almost everything, and 5 mastered. Missing topics are unassessed, not zero. Optional confidence describes uncertainty in the assessment, separately from the rating.
+
+Both documents are included in full in each probing, teaching, and practice request. Agents retrieve detailed graph evidence and past session messages selectively; existing session records remain the event history, without duplicate Markdown transcripts.
+
+A separate background updater runs after completed assessments, assessed answers, practice conclusions, and explicit teaching-preference changes. It uses the Cheap model slot unless you choose a dedicated learner-memory model in settings. These are additional provider calls with tracked usage. Missing models or credentials defer updates; teaching continues with the latest committed memory. Existing historical sessions are not automatically backfilled into ratings, and a graph entry alone is not evidence of mastery.
+
+Deleting a session retains its learned preferences, ratings, and notes, but removes that session's memory evidence references—even when its graph traces are deleted. Session deletion is not a “forget learner profile” operation; there is currently no in-app profile-reset control. The external LearnHarness skill can read the profile and retrieve selected history, but does not edit it.
+
 ![LearnHarness knowledge graph](docs/assets/knowledge-graph.png)
 
 ## Download and get started

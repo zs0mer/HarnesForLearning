@@ -36,10 +36,10 @@ describe("AgentBuildOptions.toolToggles (the P2 bridge)", () => {
 		agent.state.tools.map((t) => t.name).sort();
 
 	it("flows into the teacher's registry: a job-tool delta is a no-op on the bare set", () => {
-		// No ctx → bare agent: quiz/ask only. A job-tool delta names tools
+		// No ctx → bare agent: quiz/ask/preference. A job-tool delta names tools
 		// that don't exist there — the bridge must not crash on it.
 		const bare = createTeacherAgent(undefined, { engine: fauxEngine(), toolToggles: { research: false } });
-		assert.deepEqual(toolNames(bare), ["ask_user_question", "quiz"]);
+		assert.deepEqual(toolNames(bare), ["ask_user_question", "quiz", "remember_learner_preference"]);
 	});
 
 	it("flows into the prober's registry; probe_done survives everything", () => {

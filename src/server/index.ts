@@ -18,9 +18,10 @@ export { readRenderSettings, writeRenderSettings } from "../store/render-setting
 // seam they touch (the raw record, not the chat-section convenience view).
 export {
 	readSettings as readSettingsRecord,
-	writeSettings as writeSettingsRecord,
 	settingsStore,
 } from "../store/settings.ts";
+export { writeSettingsRecord } from "./settings.ts";
+export { learnerMemoryCoordinator, refreshLearnerMemory } from "./learner-memory-runtime.ts";
 export { promptOverrides } from "../store/prompt-overrides.ts";
 export { isValidSegmentPath } from "../core/prompt-segments.ts";
 // The canonical segment discovery/resolution lives in the agent layer

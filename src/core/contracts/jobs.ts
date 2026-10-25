@@ -12,7 +12,12 @@ import { newHandoffMessage } from "../native-messages.ts";
 
 // ─── Async sub-agent jobs (vision §2.5; plan.md Wave 0 protocol) ────────────
 
-export type JobKind = "research" | "demo" | "visual" | "pdf";
+export type DispatchJobKind = "research" | "demo" | "visual" | "pdf";
+/** Operational memory jobs never participate in ack-and-steer delivery. */
+export type JobKind = DispatchJobKind | "memory";
+export function isDispatchJobKind(kind: JobKind): kind is DispatchJobKind {
+	return kind === "research" || kind === "demo" || kind === "visual" || kind === "pdf";
+}
 export type JobStatus = "running" | "done" | "error";
 
 export interface JobRecord {
@@ -311,6 +316,7 @@ export function isSubagentFailure(
 	kind: JobKind,
 	result: ResearchResult | DemoResult | VisualResult | PdfResult,
 ): boolean {
+	if (!isDispatchJobKind(kind)) throw new Error("Operational jobs have no subagent result");
 	if (kind === "research") {
 		const r = result as ResearchResult;
 		return r.sources.length === 0 && /^Research failed:/i.test(r.brief);
@@ -362,6 +368,7 @@ export function buildSubagentSteer(
 	job: Pick<JobRecord, "id" | "kind" | "toolCallId">,
 	result: ResearchResult | DemoResult | VisualResult | PdfResult,
 ): SteerMessage {
+	if (!isDispatchJobKind(job.kind)) throw new Error("Operational jobs cannot steer teachers");
 	return {
 		id: `steer_${job.id}`,
 		role: "custom",
@@ -384,6 +391,7 @@ export function buildSubagentSteer(
 export function buildAbortSteer(
 	job: Pick<JobRecord, "id" | "kind" | "toolCallId">,
 ): SteerMessage {
+	if (!isDispatchJobKind(job.kind)) throw new Error("Operational jobs cannot steer teachers");
 	const meta = { jobId: job.id, kind: job.kind, toolCallId: job.toolCallId, aborted: true } as const;
 	return {
 		id: `steer_${job.id}`,

@@ -24,6 +24,7 @@ import { emit } from "../core/events.ts";
 
 interface LhGlobal {
 	__lhTurnRegistry?: Map<string, number>;
+	__lhSessionDeletions?: Set<string>;
 }
 
 function registry(): Map<string, number> {
@@ -32,6 +33,14 @@ function registry(): Map<string, number> {
 }
 
 const inFlight = registry();
+const deleting = ((globalThis as typeof globalThis & LhGlobal).__lhSessionDeletions ??= new Set<string>());
+export function isSessionDeleting(chatId: string): boolean { return deleting.has(chatId); }
+export function beginSessionDeletion(chatId: string): boolean {
+	if (isSessionDeleting(chatId) || isTurnRunning(chatId)) return false;
+	deleting.add(chatId);
+	return true;
+}
+export function endSessionDeletion(chatId: string): void { deleting.delete(chatId); }
 const MAX_TURN_MS = 30 * 60_000;
 
 /**
@@ -42,7 +51,7 @@ const MAX_TURN_MS = 30 * 60_000;
  * double-begin (the 409 path) stays silent — no turn began.
  */
 export function beginTurn(chatId: string): boolean {
-	if (isTurnRunning(chatId)) return false;
+	if (isTurnRunning(chatId) || isSessionDeleting(chatId)) return false;
 	inFlight.set(chatId, Date.now());
 	emit("turn-started", { chatId });
 	return true;

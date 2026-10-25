@@ -103,9 +103,12 @@ export interface CompactionDeps {
 	 *  effective-trigger ruling. The catalog window lookup is the
 	 *  caller's (chat-handler has the model id at hand). */
 	thresholdTokens: number;
-	/** The composed system prompt's token estimate (chars/4) — the
-	 *  projection the provider actually receives starts with it. */
+	/** Static system instructions' token estimate (chars/4), excluding
+	 *  dynamicPromptTokens. Only added when there is no usage anchor. */
 	systemPromptTokens: number;
+	/** Freshly injected dynamic prompt content (e.g. full learner memory).
+	 *  Added even with a usage anchor: its previous size is unknown. */
+	dynamicPromptTokens?: number;
 	/** Injectable summarizer (tests); default = the sub-agent one-shot. */
 	summarize?: Summarizer;
 }
@@ -154,11 +157,15 @@ export function effectiveThresholdTokens(settingTokens: number | undefined, cont
  *  marker (that usage described context the next request will NOT
  *  carry), so the fallback path runs the plain heuristic over the
  *  CUT-HONORED projection (never the dropped span) plus the additive
- *  prompt term the anchor would have covered. */
-export function projectedContextTokens(messages: readonly LhMessage[], systemPromptTokens: number): number {
+ *  prompt term the anchor would have covered. Dynamic prompt content
+ *  is always added separately: no durable baseline records how much of
+ *  it an old usage anchor included. This deliberately overcounts at most
+ *  the current dynamic estimate rather than re-adding the entire static
+ *  prompt or silently missing growth caused by other sessions. */
+export function projectedContextTokens(messages: readonly LhMessage[], systemPromptTokens: number, dynamicPromptTokens = 0): number {
 	const est = estimateContextTokens(messages);
-	if (est.lastUsageIndex !== null) return est.tokens;
-	return estimateTokens(toLlmMessages(messages as readonly AgentMessage[]) as unknown as readonly LhMessage[]) + systemPromptTokens;
+	if (est.lastUsageIndex !== null) return est.tokens + dynamicPromptTokens;
+	return estimateTokens(toLlmMessages(messages as readonly AgentMessage[]) as unknown as readonly LhMessage[]) + systemPromptTokens + dynamicPromptTokens;
 }
 
 // ─── the compaction run ─────────────────────────────────────────────────────
@@ -171,7 +178,7 @@ async function compact(deps: CompactionDeps, chatId: string): Promise<void> {
 	const record = deps.chatStore.getChat(chatId);
 	if (!record) return;
 	const messages = record.messages;
-	const tokensBefore = projectedContextTokens(messages, deps.systemPromptTokens);
+	const tokensBefore = projectedContextTokens(messages, deps.systemPromptTokens, deps.dynamicPromptTokens);
 	if (tokensBefore <= deps.thresholdTokens) return; // settled beneath while we waited
 
 	const cut = compactionCutIndex(messages);
@@ -272,7 +279,7 @@ export async function ensureCompacted(deps: CompactionDeps, chatId: string): Pro
 	if (deps.canStart?.() === false) return;
 	const record = deps.chatStore.getChat(chatId);
 	if (!record) return;
-	if (projectedContextTokens(record.messages, deps.systemPromptTokens) <= deps.thresholdTokens) return;
+	if (projectedContextTokens(record.messages, deps.systemPromptTokens, deps.dynamicPromptTokens) <= deps.thresholdTokens) return;
 	if (state().inFlight.has(chatId)) return; // a concurrent caller started it while we awaited
 	const run = compact(deps, chatId);
 	state().inFlight.set(chatId, run);
@@ -297,7 +304,7 @@ export function kickCompaction(buildDeps: () => CompactionDeps | null, chatId: s
 	if (!deps || deps.canStart?.() === false) return;
 	const record = deps.chatStore.getChat(chatId);
 	if (!record) return;
-	if (projectedContextTokens(record.messages, deps.systemPromptTokens) <= deps.thresholdTokens) return;
+	if (projectedContextTokens(record.messages, deps.systemPromptTokens, deps.dynamicPromptTokens) <= deps.thresholdTokens) return;
 	const run = compact(deps, chatId);
 	state().inFlight.set(chatId, run);
 	void run.finally(() => state().inFlight.delete(chatId));

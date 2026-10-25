@@ -179,6 +179,9 @@ export function DeleteSessionBody({
 				This permanently removes the session — its messages, background jobs, and extraction records. Everything
 				it added to the graph stays unless you check below. This cannot be undone.
 			</p>
+			<p className="mt-2 text-sm text-muted-foreground">
+				Learned teaching preferences, knowledge ratings, and notes stay. References to this session are removed.
+			</p>
 			<label
 				data-testid={TRACES_COPY.testid}
 				className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/60 px-4 py-3"

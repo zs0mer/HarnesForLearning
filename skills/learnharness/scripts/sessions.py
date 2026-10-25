@@ -22,6 +22,7 @@ LEARNING_TOOLS = QUESTION_TOOLS | {"problem", "conclude", "probe_done", "plan_in
 OPERATION_TOOLS = {
     "read", "ls", "grep", "find", "bash", "write", "edit", "list_sessions",
     "list_propositions", "get_session", "get_proposition", "search", "web_search", "web_fetch",
+    "find_learning_history", "read_learning_history",
 }
 MARKERS = {
     "graph-context", "probe-handoff", "subagent-steer", "subagent-abort", "plan-block",
@@ -123,8 +124,44 @@ def _answer_snapshot(message: dict[str, Any]) -> tuple[Any, str]:
     return content, "content (unparsed; full snapshot unavailable)"
 
 
+def message_selection(messages: list[dict[str, Any]], message_ids: list[str]) -> set[int]:
+    """Select exact IDs plus occurrence-bound call families; never last-wins."""
+    requested = set(message_ids)
+    missing = requested - {message.get("id") for message in messages}
+    if missing:
+        raise DataError(f"Unknown message IDs: {', '.join(sorted(missing))}; no partial selection returned.")
+    selected = {i for i, message in enumerate(messages) if message.get("id") in requested}
+    preceding: dict[str, int] = {}
+    families: dict[int, set[int]] = {}
+    active_problem: set[int] | None = None
+    for index, message in enumerate(messages):
+        if message.get("role") == "assistant" and isinstance(message.get("content"), list):
+            for block in message["content"]:
+                if isinstance(block, dict) and block.get("type") == "toolCall" and isinstance(block.get("id"), str):
+                    preceding[block["id"]] = index
+                    families.setdefault(index, {index})
+                    if block.get("name") == "problem":
+                        active_problem = families[index]
+                    if block.get("name") == "conclude" and active_problem is not None:
+                        active_problem.update(families[index])
+                        families[index] = active_problem
+                        active_problem = None
+        details = message.get("details")
+        call_id = message.get("toolCallId") if message.get("role") == "toolResult" else (
+            (details.get("problemCallId") or details.get("toolCallId"))
+            if message.get("role") == "custom" and isinstance(details, dict) else None)
+        parent = preceding.get(call_id) if isinstance(call_id, str) else None
+        if parent is not None:
+            families[parent].add(index)
+    result = set(selected)
+    for family in families.values():
+        if family & selected:
+            result.update(family)
+    return result
+
+
 def selected_record(record: dict[str, Any], *, include_agent_thinking: bool = False,
-                    include_operations: bool = False) -> dict[str, Any]:
+                    include_operations: bool = False, message_ids: list[str] | None = None) -> dict[str, Any]:
     """Select native fields, with a source-addressed omission ledger in both formats."""
     omissions: list[dict[str, str]] = []
     selected: dict[str, Any] = {}
@@ -136,8 +173,14 @@ def selected_record(record: dict[str, Any], *, include_agent_thinking: bool = Fa
         else:
             selected[key] = _safe_payload(value, key, omissions)
     messages = []
+    indexes = message_selection(record["messages"], message_ids) if message_ids else None
+    source_indexes = []
     for index, original in enumerate(record["messages"]):
         source = f"messages[{index}]"
+        if indexes is not None and index not in indexes:
+            _omit(omissions, source, "outside requested message IDs and related call/result families")
+            continue
+        source_indexes.append(index)
         message = {}
         raw_tool = original.get("toolName")
         tool = raw_tool if isinstance(raw_tool, str) else None
@@ -227,6 +270,7 @@ def selected_record(record: dict[str, Any], *, include_agent_thinking: bool = Fa
             "Unknown markers/content/metadata have unsupported/unrendered semantics; their stored fields are preserved.",
         ],
         "omissions": omissions, "omitted_field_count": len(omissions),
+        "source_message_indexes": source_indexes,
     }
 
 
@@ -346,7 +390,8 @@ def render_markdown(selection: dict[str, Any]) -> str:
     statuses = _call_statuses(record["messages"])
     for index, message in enumerate(record["messages"]):
         role = message.get("role")
-        identity = f"messages[{index}] · id={message.get('id', '(missing)')}"
+        source_index = selection.get("source_message_indexes", list(range(len(record["messages"]))))[index]
+        identity = f"messages[{source_index}] · id={message.get('id', '(missing)')}"
         title = {"user": "Learner", "assistant": "Teacher", "toolResult": "Tool result", "custom": "Marker"}.get(role, "Unsupported/unrendered role")
         lines.extend([f"## {title} — {_text(identity)}", ""])
         if role not in {"user", "assistant", "toolResult", "custom"}:
@@ -433,6 +478,8 @@ def main(argv: list[str] | None = None) -> int:
     reader.add_argument("session_id", metavar="SESSION_ID")
     reader.add_argument("--include-agent-thinking", action="store_true")
     reader.add_argument("--include-operations", action="store_true")
+    reader.add_argument("--message-id", action="append", dest="message_ids", metavar="MESSAGE_ID",
+                        help="Select exact message ID (repeatable), plus related calls/results and linked practice work")
     args = parser.parse_args(argv)
     try:
         root = data_root(args.data_dir)
@@ -450,7 +497,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             value = selected_record(read_chat(root, args.session_id),
                                     include_agent_thinking=args.include_agent_thinking,
-                                    include_operations=args.include_operations)
+                                    include_operations=args.include_operations,
+                                    message_ids=args.message_ids)
             value["data_dir"] = str(root)
             if args.format == "json":
                 print_json(value)

@@ -39,13 +39,15 @@ import {
 	resolveRoleSpec,
 } from "../core/settings-resolution.ts";
 import { modelsNotConfigured, providerKeyMissing as providerKeyMissingEnvelope, type ProviderKeyMissing } from "../core/settings.ts";
-import { beginTurn, endTurn } from "./turn-liveness.ts";
+import { beginTurn, endTurn, isSessionDeleting, isTurnRunning } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, unregisterTurn } from "./turn-runs.ts";
-import { persistTurn, triggerExtraction } from "./turn-service.ts";
+import { persistTurnResult, triggerExtraction } from "./turn-service.ts";
+import { learnerMemoryCoordinator, scanLearnerMemory } from "./learner-memory-runtime.ts";
+import { formatLearnerMemory, type LearnerMemorySnapshot } from "../core/learner-memory.ts";
 import { hasProbeDone, danglingQuestionOf } from "../core/native-messages.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
-import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
+import { ensureCompacted, kickCompaction, effectiveThresholdTokens, compactionInFlight } from "./compaction.ts";
 import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
 import { emit } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
@@ -243,23 +245,44 @@ export async function handleChatInput(
 	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
 	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : "The selected model is unavailable." }, { status: 503 }); }
 	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
+	let learnerMemory: LearnerMemorySnapshot;
+	try {
+		learnerMemoryCoordinator.activate();
+		learnerMemory = await stores.learnerMemoryStore.read();
+	} catch (error) {
+		console.error(`[chat ${chatId}] memory read failed:`, error);
+		return Response.json({ error: "Failed to read learner memory" }, { status: 500 });
+	}
 	await ensureCompacted(
 		{
 			chatStore: stores.chatStore,
 			engine: piEngineForSpec(conversation, true),
-			canStart: () => conversation.provider !== "chatgpt" || chatGPTBackgroundAllowed(),
+			canStart: () => !isTurnRunning(chatId) && !isSessionDeleting(chatId) && (conversation.provider !== "chatgpt" || chatGPTBackgroundAllowed()),
 			modelId: modelIdForCompaction,
 			kind: record.kind === "practice" ? "practice" : hasProbeDone(record.messages) ? "teach" : "probe",
 			thresholdTokens: effectiveThresholdTokens(
 				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
 			),
-			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : "teacher").length / 4),
+			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : "teacher", effective.agent.prompts).length / 4),
+			dynamicPromptTokens: Math.ceil(("\n\n---\n\n".length + formatLearnerMemory(learnerMemory).length) / 4),
 		},
 		chatId,
 	);
 	const compactedRecord = stores.chatStore.getChat(chatId);
-	if (compactedRecord) record = compactedRecord;
+	if (!compactedRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
+	record = compactedRecord;
+	// Compaction may have awaited a model; never reuse a stale memory snapshot.
+	try { learnerMemory = await stores.learnerMemoryStore.read(); }
+	catch (error) {
+		console.error(`[chat ${chatId}] memory read failed:`, error);
+		return Response.json({ error: "Failed to read learner memory" }, { status: 500 });
+	}
+	// The memory read yields too: deletion/another turn may have won meanwhile.
+	const currentRecord = stores.chatStore.getChat(chatId);
+	if (!currentRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
+	record = currentRecord;
+	if (isSessionDeleting(chatId) || isTurnRunning(chatId) || compactionInFlight(chatId)) return Response.json({ error: "Session is busy" }, { status: 409 });
 
 	// The input's native appends (pure; the honest 400 for an answer with no
 	// pending question call). Computed BEFORE beginTurn so a refused input
@@ -293,7 +316,12 @@ export async function handleChatInput(
 	// the composer gates), so adjacency holds by construction.
 	if (input.type === "answer" && danglingQuestionOf([...record.messages, ...appends]) !== null) {
 		const merged = [...record.messages, ...appends];
-		stores.chatStore.saveMessages(chatId, merged);
+		try { stores.chatStore.saveMessages(chatId, merged); }
+		catch (error) {
+			console.error(`[chat ${chatId}] answer persist failed:`, error);
+			return Response.json({ error: "Failed to persist answer" }, { status: 500 });
+		}
+		scanLearnerMemory(chatId);
 		emit("record-changed", { chatId });
 		return settledTurnResponse(); // the cheap terminal — no beginTurn, no turn
 	}
@@ -316,7 +344,10 @@ export async function handleChatInput(
 	const stagedAutomatic = conversation.provider === "chatgpt" && input.type === "steers";
 	let persistBaseCount = stagedAutomatic ? record.messages.length : merged.length;
 	try {
-		if (!stagedAutomatic) stores.chatStore.saveMessages(chatId, merged);
+		if (!stagedAutomatic) {
+			stores.chatStore.saveMessages(chatId, merged);
+			scanLearnerMemory(chatId);
+		}
 		// Dock fix (owner ruling 2026-09-26): persisted markers are visible
 		// in the record — flip their jobs now (the wake's steers ride this
 		// write-ahead; the delivering turn may run for minutes).
@@ -325,6 +356,8 @@ export async function handleChatInput(
 		}
 	} catch (err) {
 		console.error(`[chat ${chatId}] write-ahead persist failed:`, err);
+		endTurn(chatId);
+		return Response.json({ error: "Failed to persist turn input" }, { status: 500 });
 	}
 
 	// MONEY CHANNEL (wave 4): one collector per request, fed by the agent's
@@ -367,17 +400,19 @@ export async function handleChatInput(
 	// enabled). The definitive toggleable set is TOGGLEABLE_TOOLS — the
 	// sub-agent JOB tools (research/demo/visual/pdf; adjudicated with the
 	// user: quiz/ask/fs/plan/probe_done are always-on).
+	try {
 	if (conversation.provider === "chatgpt") requestCycle = new ChatGPTRequestCycle({
 		initialMessages: asAgentMessages(merged),
 		staged: stagedAutomatic ? asAgentMessages(appends) : undefined,
 		foregroundOwed: !callPurpose.background,
 		purpose: callPurpose,
 		scopeCurrent: chatGPTScopeCurrent,
-		commitStaged: () => { stores.chatStore.saveMessages(chatId, merged); persistBaseCount = merged.length; },
+		commitStaged: () => { stores.chatStore.saveMessages(chatId, merged); persistBaseCount = merged.length; scanLearnerMemory(chatId); },
 		restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
 	});
 	const agentOpts: AgentBuildOptions = {
 		engine,
+		learnerMemory,
 		callPurpose,
 		requestCycle,
 		messages: asAgentMessages(merged),
@@ -403,6 +438,7 @@ export async function handleChatInput(
 				{
 					chatId,
 					chatStore: stores.chatStore,
+					history: { graph: stores.graphStore, chats: stores.chatStore },
 					// TARGET VALIDATION (owner round 9): the practice tools read the
 					// WHOLE graph fresh per pose — targets validate against every
 					// proposition, not just the session's picks (pickless sessions
@@ -427,6 +463,7 @@ export async function handleChatInput(
 					{
 						chatId,
 						chatStore: stores.chatStore,
+						history: { graph: stores.graphStore, chats: stores.chatStore },
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
 						// The registry drop's signal (2026-09-20): no live engine
@@ -439,6 +476,7 @@ export async function handleChatInput(
 					{
 						chatId,
 						chatStore: stores.chatStore,
+						history: { graph: stores.graphStore, chats: stores.chatStore },
 						deliver: (steer) => void deliverJobResult(steer),
 						// Fix wave (2026-09-20): the prober carries research + pdf
 						// dispatch (owner ruling — phase-omnipresent), so its ctx
@@ -457,7 +495,6 @@ export async function handleChatInput(
 	// A test-injected agent gets no usage collector (tests assert the
 	// transcript, not the money channel); when it's ours, usage flows through
 	// the factory's subscription (wired above via onUsage).
-	try {
 		// THE TURN AS A BACKGROUND OBJECT (owner ruling, 2026-09-25):
 		// runPiTurn executes decoupled from this response — the POST stream
 		// is just the FIRST subscriber (a view). A client disconnect can no
@@ -499,9 +536,12 @@ export async function handleChatInput(
 				return "An error occurred.";
 			},
 			onFinish: (turnMessages, isAborted) => {
+				try {
 				// Wave B: the record write is the agent's own final state —
 				// the new messages are the slice past the merged base.
-				const stamped = persistTurn(stores.chatStore, chatId, persistBaseCount, turnMessages, isAborted);
+				const persistence = persistTurnResult(stores.chatStore, chatId, persistBaseCount, turnMessages, isAborted);
+				const stamped = persistence.messages;
+				if (persistence.persisted) scanLearnerMemory(chatId);
 				// usage log append (idempotent per turn id) — the stats bar
 				// refolds this on the client after the turn settles. The
 				// provenance message is the turn's FIRST new assistant message.
@@ -520,7 +560,7 @@ export async function handleChatInput(
 				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
 				// no extraction, no graph, no coverage (v1: the session itself
 				// is the deliverable).
-				if ((!requestCycle || requestCycle.dispatched) && record.kind !== "practice" && extractionEnabled(effective.graph)) {
+				if (persistence.persisted && (!requestCycle || requestCycle.dispatched) && record.kind !== "practice" && extractionEnabled(effective.graph)) {
 					// Fresh per-turn read of the graph section's chunk budget
 					// (extraction-UX redesign, 2026-09-24): the trigger compares
 					// against it and the pipeline's batches share it.
@@ -561,7 +601,7 @@ export async function handleChatInput(
 				// beneath-threshold record is a silent no-op. Skipped under
 				// tests (the extraction precedent — scripted chats are
 				// fixtures; the service itself is pinned directly).
-				if (process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
+				if (persistence.persisted && process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
 					kickCompaction(() => {
 						const fresh = effectiveSettings();
 						const spec = resolveConversationSpec(stores.chatStore.getChat(chatId)?.settings, fresh.models.strong);
@@ -574,16 +614,22 @@ export async function handleChatInput(
 						return {
 							chatStore: stores.chatStore,
 							engine: kickEngine,
-							canStart: () => spec.provider !== "chatgpt" || chatGPTBackgroundAllowed(),
+							canStart: () => !isTurnRunning(chatId) && !isSessionDeleting(chatId) && (spec.provider !== "chatgpt" || chatGPTBackgroundAllowed()),
 							modelId: kickModelId,
 							kind: freshRecord.kind === "practice" ? "practice" : hasProbeDone(freshRecord.messages) ? "teach" : "probe",
 							thresholdTokens: effectiveThresholdTokens(
 								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
 							),
-							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher").length / 4),
+							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher", fresh.agent.prompts).length / 4),
+							dynamicPromptTokens: Math.ceil(("\n\n---\n\n".length + formatLearnerMemory(learnerMemory).length) / 4),
 						};
 					}, chatId);
+				} finally {
+					endTurn(chatId);
+					unregisterTurn(chatId);
+					unregisterLiveAgent(chatId);
+				}
 			},
 		});
 		// The turn is now a live background object: register it so any view

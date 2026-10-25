@@ -7,7 +7,7 @@
  *
  * Model slots (model-slots wave, 2026-09-20, owner ruling: SLOTS ONLY —
  * the six per-role rows disappeared; per-role overrides remain in the
- * schema for a future advanced surface): Strong = Prober + Teacher, Cheap
+ * schema; memoryUpdater now has a dedicated override below): Strong = Prober + Teacher, Cheap
  * = the five workhorse roles, Vision = Visual maker + PDF reader. Each
  * slot row carries the shared dropdown (fuzzy search, arrow-walk, Enter
  * pick — ModelMenuList/ThinkingMenuList from ./model-menu.tsx) over the
@@ -66,6 +66,7 @@ import {
 	type ModelCatalogEntry,
 	type ModelSlotName,
 	type ModelsSettings,
+	type RoleModelOverride,
 } from "@/src/core";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
@@ -106,7 +107,7 @@ interface ModelsBody {
 	/** The three tiers' RESOLVED pins (BYOK: NULL per unset tier — no
 	 *  factory floor) — machinery only (the thinking list fallback); the
 	 *  rows' displays read the record override, never a phantom pin. */
-	slots: Record<ModelSlotName, { model: { provider: string; id: string }; thinkingLevel?: string } | null>;
+	slots: Record<ModelSlotName, { model: { provider: string; id: string }; thinkingLevel?: ThinkingLevel } | null>;
 }
 
 /** Compose: one tool toggled, the rest of the section carried verbatim.
@@ -154,6 +155,15 @@ export function composeSlotModel(
 		...(thinking ? { thinkingLevel: thinking as ThinkingLevel } : {}),
 	};
 	return next;
+}
+
+/** Replace only the learner-memory override; undefined restores the Cheap
+ * slot for both fields without disturbing other background-role settings. */
+export function composeMemoryUpdater(agent: AgentSettings | undefined, override: RoleModelOverride | undefined): AgentSettings {
+	const models = { ...agent?.models };
+	if (override) models.memoryUpdater = override;
+	else delete models.memoryUpdater;
+	return { ...agent, models };
 }
 
 /** Compose: the search-engine preference. null = the explicit pin is
@@ -317,7 +327,7 @@ export function AgentSection({
 	const [segmentStatus, setSegmentStatus] = useState<string | null>(null);
 	/** One open dropdown for the whole section: which slot (or the search
 	 *  row), which kind. */
-	const [openMenu, setOpenMenu] = useState<{ target: ModelSlotName | "search"; kind: "model" | "thinking" | "engine" } | null>(null);
+	const [openMenu, setOpenMenu] = useState<{ target: ModelSlotName | "memoryUpdater" | "search"; kind: "model" | "thinking" | "engine" } | null>(null);
 	const menuAnchorRef = useRef<HTMLSpanElement>(null);
 
 	const refreshSearch = () =>
@@ -720,6 +730,69 @@ export function AgentSection({
 						</SettingsRow>
 					);
 				})}
+				{(() => {
+					const override = agent?.models?.memoryUpdater;
+					const cheap = models?.cheap ?? slots?.cheap;
+					const coord = override?.model ?? cheap?.model;
+					const chosen = coord ? catalog?.find((m) => m.id === coord.id && m.provider === coord.provider) : undefined;
+					const levels = chosen?.supportedLevels ?? THINKING_LEVELS;
+					const thinking = override?.thinkingLevel ?? cheap?.thinkingLevel;
+					const thisMenuOpen = openMenu?.target === "memoryUpdater" ? openMenu.kind : null;
+					return (
+						<SettingsRow label="Learner memory updater" hint="Updates your cross-session memory; uses the Cheap slot unless overridden" testid="role-row-memoryUpdater">
+							<span ref={thisMenuOpen ? menuAnchorRef : undefined} className="relative flex items-center gap-2">
+								<ChatGPTBackgroundAccess provider={coord?.provider} />
+								<MenuTrigger
+									value={override?.model ? prettyModel(override.model.id) : ""}
+									emptyLabel="Cheap slot"
+									ariaLabel="Learner memory updater model"
+									testid="role-model-memoryUpdater"
+									open={thisMenuOpen === "model"}
+									onClick={() => setOpenMenu(thisMenuOpen === "model" ? null : { target: "memoryUpdater", kind: "model" })}
+									widthClass="min-w-20"
+								/>
+								<MenuTrigger
+									value={thinking || (chosen ? defaultOrderLevel(levels) : "")}
+									emptyLabel="Cheap slot"
+									ariaLabel="Learner memory updater thinking"
+									testid="role-thinking-memoryUpdater"
+									open={thisMenuOpen === "thinking"}
+									onClick={() => setOpenMenu(thisMenuOpen === "thinking" ? null : { target: "memoryUpdater", kind: "thinking" })}
+									widthClass="w-20"
+								/>
+								{override && <button type="button" data-testid="role-reset-memoryUpdater" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => {
+									onSectionChange(composeMemoryUpdater(agent, undefined));
+									setOpenMenu(null);
+								}}>Use Cheap slot</button>}
+								{thisMenuOpen === "model" && (
+									<MenuShell preferredSide="down" anchorTestid="role-model-memoryUpdater" testid="role-model-menu-memoryUpdater" menuClass="flex w-[22rem] flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl">
+										<ModelMenuList
+											models={catalog ?? undefined}
+											effectiveId={coord?.id}
+											effectiveProvider={coord?.provider}
+											onPick={(entry) => {
+												onSectionChange(composeMemoryUpdater(agent, {
+													model: { provider: entry.provider, id: entry.id },
+													thinkingLevel: populateLevel(thinking, entry.supportedLevels),
+												}));
+												setOpenMenu(null);
+											}}
+											footer={catalog?.length === 0 ? "No models — add a provider key in Keys" : "Runs only the learner memory updater"}
+										/>
+									</MenuShell>
+								)}
+								{thisMenuOpen === "thinking" && (
+									<MenuShell preferredSide="down" anchorTestid="role-thinking-memoryUpdater" testid="role-thinking-menu-memoryUpdater" menuClass="flex w-44 flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl">
+										<ThinkingMenuList levels={levels.map(String)} effectiveLevel={thinking || (chosen ? defaultOrderLevel(levels) : undefined)} onPick={(level) => {
+											onSectionChange(composeMemoryUpdater(agent, { ...override, thinkingLevel: level as ThinkingLevel }));
+											setOpenMenu(null);
+										}} />
+									</MenuShell>
+								)}
+								</span>
+						</SettingsRow>
+					);
+				})()}
 			</SettingsGroup>
 
 			<SettingsGroup label="Tools" testid="group-tools">

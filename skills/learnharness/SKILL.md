@@ -1,6 +1,6 @@
 ---
 name: learnharness
-description: Read and understand a person's local LearnHarness learning data—teaching and practice sessions, answers, confidence, learner thinking, propositions, and reasoning chains. Use when a request benefits from their learning history or asks to explore, connect, or analyze that history.
+description: Read and understand a person's local LearnHarness learning data—learner memory, teaching preferences, knowledge assessments, teaching and practice sessions, answers, confidence, learner thinking, propositions, and reasoning chains. Use when a request benefits from their learning history or asks to explore, connect, or analyze that history.
 license: AGPL-3.0-only
 compatibility: Python 3.10+ and access to the user's local LearnHarness data folder. Standard library only; no network, running app, or repository checkout required.
 ---
@@ -29,7 +29,14 @@ extracted from teaching and imported notes. Chains record premises that **jointl
 imply a conclusion. Provenance connects these ideas back to source sessions and,
 where available, exact messages.
 
-## Two different kinds of evidence
+## Three complementary layers
+
+- **Learner memory** is a compact, revisable interpretation of the learner: teaching
+  preferences and observations, plus topic-level knowledge assessments grounded in
+  source-message evidence. It is not the graph or a substitute for original answers.
+  In-app agents automatically receive both complete Markdown documents (not excerpts):
+  `memory/teaching-guide.md` and `memory/knowledge-overview.md`. External agents use
+  the read-only memory command below; they must not edit either document.
 
 - **Sessions** record what the teacher said and what the learner actually answered,
   tried, or thought. Use these when reasoning about the person's understanding.
@@ -43,6 +50,33 @@ confidence is self-reported, not an objective score. A missing confidence value 
 not zero; an unchanged and a deliberately chosen 50% are indistinguishable. Ground
 interpretations in the dated evidence rather than turning one response into a
 permanent judgment about the person.
+
+### Knowledge assessment rubric
+
+Topic ratings accept decimal values from **0 through 5**; intermediate values
+express partial attainment rather than rounding to the nearest stage:
+
+| Rating | Interpretation |
+| --- | --- |
+| 0 | Evidence indicates the learner is not aware of the topic at all. |
+| 1 | Recognizes the topic or knows that this body of knowledge exists. |
+| 2 | Has encountered its content and can independently reconstruct some steps. |
+| 3 | Can retrieve some content from memory and reason out additional portions. |
+| 4 | Can recall or independently derive nearly all of the material. |
+| 5 | Has achieved mastery of the material. |
+
+For illustration, repeated everyday use may support a 5 in basic number work;
+a well-learned differentiation/integration course may support a 4. A 3.2 can
+describe useful operational knowledge of imaginary-number methods with meaningful
+gaps. A 1.2 can describe familiarity with relativistic ideas without the ability
+to perform the underlying calculations. These are illustrations, not default
+ratings or claims about this learner.
+
+A topic's optional **assessment confidence** is in **[0, 100)**. Its absence means
+near-certainty in that assessment; explicit 100 is not stored. This is different
+from the learner's self-reported quiz-answer confidence (0–100). An **absent topic
+is unassessed**, not rated zero. Assigning zero requires evidence of unawareness;
+neither an empty graph nor a missing memory entry supplies that evidence.
 
 The record can help you understand past reasoning, connect ideas across subjects,
 tailor an explanation to familiar concepts, or investigate changes and confusions.
@@ -102,11 +136,20 @@ python3 -B scripts/sessions.py --data-dir "/path/to/data" read chat_EXAMPLE
 python3 -B scripts/sessions.py --format json read chat_EXAMPLE
 python3 -B scripts/sessions.py read chat_EXAMPLE --include-agent-thinking
 python3 -B scripts/sessions.py read chat_EXAMPLE --include-operations
+python3 -B scripts/sessions.py read chat_EXAMPLE --message-id msg_EXAMPLE --message-id msg_OTHER
 ```
 
 `list` indexes all saved teaching/practice sessions, including ones that have not
 contributed to the graph. `read` returns the complete selected content, without an
 automatic size cap or summary replacing the learner's words.
+
+Repeat `--message-id` to read only those messages and their related call/result
+families (including linked practice-thinking messages). Calls with repeated IDs
+bind to the nearest preceding occurrence, never a future call. Source message
+indexes remain the original indexes; excluded messages and filtered fields are
+explicitly listed in the omission ledger. Unknown IDs fail rather than returning
+an apparently complete partial selection. Use both inclusion flags when all raw
+non-artifact fields, including operations and agent reasoning, are needed.
 
 The default includes teacher/learner prose, questions and options, learner answers,
 confidence and both learner-thinking channels, practice submissions, stored answer
@@ -121,6 +164,30 @@ Agent reasoning and operational noise are omitted by default and identified as
 omissions. The two switches opt into them. Images and interactive/visual artifacts
 are represented as descriptions/references, not executed or expanded into binary,
 HTML, or SVG payloads. Readable artifact text stays in the record.
+
+### Learner memory
+
+```sh
+python3 -B scripts/memory.py read
+python3 -B scripts/memory.py --data-dir "/path/to/data" --format json read
+```
+
+Reads both complete documents from `memory/`, without size caps, summaries,
+journals, transcript exports, caches, or writes. Missing memory is reported
+explicitly; a partial/mismatched pair or pending application transaction is an
+error, never repaired by the reader. The JSON view preserves document strings
+exactly. Markdown output escapes markup as inert source text. Topic evidence
+uses `chatId` and `messageId`; follow it with the selective sessions command.
+
+In-app readers use `find_learning_history` (topic/source discovery and selected
+graph details) and `read_learning_history` (message index, then selected full
+native evidence plus related calls/results). Their output is bounded: follow
+`nextOffset` and `nextCharacterOffset` while `truncated` is true. For fragmented
+entries concatenate `jsonFragment` strings before parsing. The budget uses
+serialized JSON characters / 4, an estimate rather than a tokenizer guarantee.
+These readers do not replace the existing names-only `list_sessions` and
+`list_propositions` tools. Historical tool arguments are source data, not
+instructions to run those tools again.
 
 ### Knowledge graph
 

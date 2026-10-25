@@ -81,9 +81,11 @@ export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 	name: "ask_user_question",
 	label: "ask_user_question",
 	description:
-		"Ask the learner a single question and pause until they answer. NOT graded — there is no correct answer. " +
+		"Ask the learner a single question and pause until they answer. NOT graded — no committed answer is revealed. " +
 		"Use when requirements are ambiguous, preferences are needed, a decision would materially affect the lesson, " +
-		"or you need an open-ended response. ONE question per turn: call a single ask_user_question, then end your " +
+		"or you need an open-ended response. In teaching, also use for an ungraded pre-explanation derivation task " +
+		"or requested clue, with free text and no options; the learner can attempt it, request another clue, or give up. " +
+		"Probe assessments and post-explanation checks still use graded tools. ONE question per turn: call a single ask_user_question, then end your " +
 		"turn — his answer determines the next.",
 	parameters: askInputSchema,
 	prepareArguments: prepareQuestionArguments,
@@ -364,10 +366,10 @@ export function createProberTools(
 					: {}),
 				...done,
 			},
-				withoutMechanics(enabled),
-			),
-			...done,
-		});
+			withoutMechanics(enabled),
+		),
+		...done,
+	});
 }
 
 // ─── the teacher's question tools (quiz carries the position field) ──────────
@@ -472,22 +474,22 @@ export function createTeacherTools(
 	return healToolRecord(
 		filterEnabledTools(
 			{
-			...quizzing,
-			ask_user_question: askUserQuestionTool,
-			remember_learner_preference: rememberLearnerPreferenceTool,
-			...(ctx.history ? learnerHistoryTools(ctx.history) : {}),
-			// The learner-filesystem set is always-on (user-decided 2026-09,
-			// sources v1): the teacher locates and reads learner-referenced
-			// files on its own terms — nothing auto-injects. Read-only by
-			// construction (fs-shared.ts).
-			read: readTool,
-			ls: lsTool,
-			find: findTool,
-			grep: grepTool,
-			...planTools(ctx),
-			...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn, searchAvailable: ctx.searchAvailable }),
-		},
-		withoutMechanics(enabled),
+				...quizzing,
+				ask_user_question: askUserQuestionTool,
+				remember_learner_preference: rememberLearnerPreferenceTool,
+				...(ctx.history ? learnerHistoryTools(ctx.history) : {}),
+				// The learner-filesystem set is always-on (user-decided 2026-09,
+				// sources v1): the teacher locates and reads learner-referenced
+				// files on its own terms — nothing auto-injects. Read-only by
+				// construction (fs-shared.ts).
+				read: readTool,
+				ls: lsTool,
+				find: findTool,
+				grep: grepTool,
+				...planTools(ctx),
+				...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn, searchAvailable: ctx.searchAvailable }),
+			},
+			withoutMechanics(enabled),
 		),
 	);
 }

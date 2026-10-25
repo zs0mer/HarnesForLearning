@@ -470,7 +470,7 @@ async function pump(chatId: string): Promise<void> {
 	s.pumping.add(chatId);
 	let parked = false;
 	try {
-		for (let attempt = 0; ; ) {
+		for (let attempt = 0; ;) {
 			const queue = s.queues.get(chatId);
 			if (!queue || queue.length === 0) {
 				s.queues.delete(chatId);
@@ -687,7 +687,7 @@ function failJob(jobId: string, err: Error): void {
  * the steer fires right after their answer turn completes.
  */
 async function waitForIdle(chatId: string): Promise<void> {
-	for (;;) {
+	for (; ;) {
 		const record = stores.chatStore.getChat(chatId);
 		if (!record) return;
 		const blocked = isTurnRunning(chatId) || danglingQuestionOf(record.messages) !== null;

@@ -401,100 +401,100 @@ export async function handleChatInput(
 	// sub-agent JOB tools (research/demo/visual/pdf; adjudicated with the
 	// user: quiz/ask/fs/plan/probe_done are always-on).
 	try {
-	if (conversation.provider === "chatgpt") requestCycle = new ChatGPTRequestCycle({
-		initialMessages: asAgentMessages(merged),
-		staged: stagedAutomatic ? asAgentMessages(appends) : undefined,
-		foregroundOwed: !callPurpose.background,
-		purpose: callPurpose,
-		scopeCurrent: chatGPTScopeCurrent,
-		commitStaged: () => { stores.chatStore.saveMessages(chatId, merged); persistBaseCount = merged.length; scanLearnerMemory(chatId); },
-		restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
-	});
-	const agentOpts: AgentBuildOptions = {
-		engine,
-		learnerMemory,
-		callPurpose,
-		requestCycle,
-		messages: asAgentMessages(merged),
-		onUsage: collectUsage,
-		toolToggles: effective.agent.tools,
-		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
-		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
-		chatId,
-		// The prompt-override switches (P2, 2026-09-19): same resolution
-		// point as the tool delta — the agent layer composes the system
-		// prompt fresh per turn, swapping in any enabled override segments.
-		promptSwitches: effective.agent.prompts,
-	};
-	// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
-	// session builds the practitioner from turn 1 — no prober→teacher
-	// split, no plan/question/job tools; the whole registry is
-	// problem + conclude. buildAgent stays honored (the test seam is
-	// uniform across kinds).
-	const constructed: TeachingAgent = buildAgent
-		? buildAgent({ ...agentOpts, teaching })
-		: record.kind === "practice"
-			? createPracticeAgent(
-				{
-					chatId,
-					chatStore: stores.chatStore,
-					history: { graph: stores.graphStore, chats: stores.chatStore },
-					// TARGET VALIDATION (owner round 9): the practice tools read the
-					// WHOLE graph fresh per pose — targets validate against every
-					// proposition, not just the session's picks (pickless sessions
-					// and future graph-tools poses stay valid).
-					graphNodes: () => stores.graphStore.readNodes(),
-					// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
-					// (same runner/gating as the teacher's — research honestly
-					// absent when no engine is live) and the map readers behind
-					// the SAME settings gate as the prober's.
-					jobs: {
-						chatId,
-						jobStore: stores.jobStore,
-						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						searchAvailable,
-					},
-					...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
-				},
-				agentOpts,
-			)
-			: teaching
-				? createTeacherAgent(
+		if (conversation.provider === "chatgpt") requestCycle = new ChatGPTRequestCycle({
+			initialMessages: asAgentMessages(merged),
+			staged: stagedAutomatic ? asAgentMessages(appends) : undefined,
+			foregroundOwed: !callPurpose.background,
+			purpose: callPurpose,
+			scopeCurrent: chatGPTScopeCurrent,
+			commitStaged: () => { stores.chatStore.saveMessages(chatId, merged); persistBaseCount = merged.length; scanLearnerMemory(chatId); },
+			restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
+		});
+		const agentOpts: AgentBuildOptions = {
+			engine,
+			learnerMemory,
+			callPurpose,
+			requestCycle,
+			messages: asAgentMessages(merged),
+			onUsage: collectUsage,
+			toolToggles: effective.agent.tools,
+			// Debug (owner, 2026-10-04): teacher/prober raw provider events under
+			// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
+			chatId,
+			// The prompt-override switches (P2, 2026-09-19): same resolution
+			// point as the tool delta — the agent layer composes the system
+			// prompt fresh per turn, swapping in any enabled override segments.
+			promptSwitches: effective.agent.prompts,
+		};
+		// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
+		// session builds the practitioner from turn 1 — no prober→teacher
+		// split, no plan/question/job tools; the whole registry is
+		// problem + conclude. buildAgent stays honored (the test seam is
+		// uniform across kinds).
+		const constructed: TeachingAgent = buildAgent
+			? buildAgent({ ...agentOpts, teaching })
+			: record.kind === "practice"
+				? createPracticeAgent(
 					{
 						chatId,
 						chatStore: stores.chatStore,
 						history: { graph: stores.graphStore, chats: stores.chatStore },
-						jobStore: stores.jobStore,
-						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						// The registry drop's signal (2026-09-20): no live engine
-						// = no research tool in the teacher's registry.
-						searchAvailable,
+						// TARGET VALIDATION (owner round 9): the practice tools read the
+						// WHOLE graph fresh per pose — targets validate against every
+						// proposition, not just the session's picks (pickless sessions
+						// and future graph-tools poses stay valid).
+						graphNodes: () => stores.graphStore.readNodes(),
+						// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
+						// (same runner/gating as the teacher's — research honestly
+						// absent when no engine is live) and the map readers behind
+						// the SAME settings gate as the prober's.
+						jobs: {
+							chatId,
+							jobStore: stores.jobStore,
+							spawn: (job, input) => void jobRunner.runJob(job.id, input),
+							searchAvailable,
+						},
+						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
 					},
 					agentOpts,
 				)
-				: createProberAgent(
-					{
-						chatId,
-						chatStore: stores.chatStore,
-						history: { graph: stores.graphStore, chats: stores.chatStore },
-						deliver: (steer) => void deliverJobResult(steer),
-						// Fix wave (2026-09-20): the prober carries research + pdf
-						// dispatch (owner ruling — phase-omnipresent), so its ctx
-						// needs the same job wiring as the teacher's.
-						jobStore: stores.jobStore,
-						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						searchAvailable,
-						// The map reader (wave 7): the prober reads the learner's
-						// knowledge graph through tools when the gate opens —
-						// graph master switch AND the agent.graphTools toggle.
-						...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
-					},
-					agentOpts,
-				);
+				: teaching
+					? createTeacherAgent(
+						{
+							chatId,
+							chatStore: stores.chatStore,
+							history: { graph: stores.graphStore, chats: stores.chatStore },
+							jobStore: stores.jobStore,
+							spawn: (job, input) => void jobRunner.runJob(job.id, input),
+							// The registry drop's signal (2026-09-20): no live engine
+							// = no research tool in the teacher's registry.
+							searchAvailable,
+						},
+						agentOpts,
+					)
+					: createProberAgent(
+						{
+							chatId,
+							chatStore: stores.chatStore,
+							history: { graph: stores.graphStore, chats: stores.chatStore },
+							deliver: (steer) => void deliverJobResult(steer),
+							// Fix wave (2026-09-20): the prober carries research + pdf
+							// dispatch (owner ruling — phase-omnipresent), so its ctx
+							// needs the same job wiring as the teacher's.
+							jobStore: stores.jobStore,
+							spawn: (job, input) => void jobRunner.runJob(job.id, input),
+							searchAvailable,
+							// The map reader (wave 7): the prober reads the learner's
+							// knowledge graph through tools when the gate opens —
+							// graph master switch AND the agent.graphTools toggle.
+							...(graphToolsEnabled(effective) ? { graphStore: stores.graphStore } : {}),
+						},
+						agentOpts,
+					);
 
-	// A test-injected agent gets no usage collector (tests assert the
-	// transcript, not the money channel); when it's ours, usage flows through
-	// the factory's subscription (wired above via onUsage).
+		// A test-injected agent gets no usage collector (tests assert the
+		// transcript, not the money channel); when it's ours, usage flows through
+		// the factory's subscription (wired above via onUsage).
 		// THE TURN AS A BACKGROUND OBJECT (owner ruling, 2026-09-25):
 		// runPiTurn executes decoupled from this response — the POST stream
 		// is just the FIRST subscriber (a view). A client disconnect can no
@@ -537,94 +537,94 @@ export async function handleChatInput(
 			},
 			onFinish: (turnMessages, isAborted) => {
 				try {
-				// Wave B: the record write is the agent's own final state —
-				// the new messages are the slice past the merged base.
-				const persistence = persistTurnResult(stores.chatStore, chatId, persistBaseCount, turnMessages, isAborted);
-				const stamped = persistence.messages;
-				if (persistence.persisted) scanLearnerMemory(chatId);
-				// usage log append (idempotent per turn id) — the stats bar
-				// refolds this on the client after the turn settles. The
-				// provenance message is the turn's FIRST new assistant message.
-				const response = stamped.find((m) => (m as { role?: string }).role === "assistant");
-				if (response && steps.length > 0) {
-					stores.chatStore.appendTurnUsage(chatId, {
-						id: turnUsageId,
-						messageId: response.id,
-						at: new Date().toISOString(),
-						model: modelId,
-						steps,
-					});
-				}
-				// GRAPH GATE (settings-storage wave, 2026-09-19): the write channel —
-				// extraction, its auditor — dies with the master switch.
-				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
-				// no extraction, no graph, no coverage (v1: the session itself
-				// is the deliverable).
-				if (persistence.persisted && (!requestCycle || requestCycle.dispatched) && record.kind !== "practice" && extractionEnabled(effective.graph)) {
-					// Fresh per-turn read of the graph section's chunk budget
-					// (extraction-UX redesign, 2026-09-24): the trigger compares
-					// against it and the pipeline's batches share it.
-					triggerExtraction(stores, extraction, chatId, effective.graph.extractionChunkTokens);
-				}
-				// PARKED DISMISSAL (owner, 2026-10-04): a dismissal that arrived
-				// mid-turn was parked by the dismiss route (202); now that
-				// persistTurn has landed the turn's messages, apply it against
-				// real truth — BEFORE endTurn, so "turn-settled" guarantees a
-				// subsequent fetch reads the dismissal already in the record
-				// (the same ordering law as persistTurn itself).
-				applyParkedDismissal(stores.chatStore, chatId);
-				// LAST: a poller that sees not-in-flight must read an already-persisted
-				// record — endTurn only after persistTurn has done its job.
-				endTurn(chatId);
-				// And only then does the turn stop being a running object
-				// (background-turn wave, 2026-09-25): a reattach that finds
-				// nothing must find the persisted record current — the same
-				// ordering rule as endTurn.
-				unregisterTurn(chatId);
-				// Wave C steer settlement: the live agent is dead (no more
-				// followUp handoffs) - reconcile the steer registry against
-				// what this run actually persisted (in-run injections
-				// resolve; stranded markers return to pending), then let
-				// the pump take any stragglers down the idle wake.
-				unregisterLiveAgent(chatId);
-				settleSteers(chatId, stamped);
-				// Composer steers (2026-10-03): delivered ids dropped, stranded
-				// ones stay parked for the chat's next run (the registry is the
-				// stranding safety net — the agent's undrained copy died above).
-				reconcileUserSteers(chatId, stamped);
-				// THE SETTLE KICK (owner round 14): the turn settled — if the
-				// projection is now over threshold, the summary starts in the
-				// background, INSIDE the learner's reading/answering pause
-				// (question/problem poses end runs, so this moment is always a
-				// between-runs window). The next turn's ensureCompacted gate
-				// awaits whatever this leaves running; a lost engine or a
-				// beneath-threshold record is a silent no-op. Skipped under
-				// tests (the extraction precedent — scripted chats are
-				// fixtures; the service itself is pinned directly).
-				if (persistence.persisted && process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
-					kickCompaction(() => {
-						const fresh = effectiveSettings();
-						const spec = resolveConversationSpec(stores.chatStore.getChat(chatId)?.settings, fresh.models.strong);
-						if (!spec || (spec.provider === "chatgpt" && !chatGPTBackgroundAllowed())) return null;
-						let kickEngine: PiEngine;
-						try { kickEngine = piEngineForSpec(spec, true); } catch { return null; }
-						const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
-						const freshRecord = stores.chatStore.getChat(chatId);
-						if (!freshRecord) return null;
-						return {
-							chatStore: stores.chatStore,
-							engine: kickEngine,
-							canStart: () => !isTurnRunning(chatId) && !isSessionDeleting(chatId) && (spec.provider !== "chatgpt" || chatGPTBackgroundAllowed()),
-							modelId: kickModelId,
-							kind: freshRecord.kind === "practice" ? "practice" : hasProbeDone(freshRecord.messages) ? "teach" : "probe",
-							thresholdTokens: effectiveThresholdTokens(
-								fresh.compaction?.thresholdTokens,
-								catalogContextLimits().get(kickModelId),
-							),
-							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher", fresh.agent.prompts).length / 4),
-							dynamicPromptTokens: Math.ceil(("\n\n---\n\n".length + formatLearnerMemory(learnerMemory).length) / 4),
-						};
-					}, chatId);
+					// Wave B: the record write is the agent's own final state —
+					// the new messages are the slice past the merged base.
+					const persistence = persistTurnResult(stores.chatStore, chatId, persistBaseCount, turnMessages, isAborted);
+					const stamped = persistence.messages;
+					if (persistence.persisted) scanLearnerMemory(chatId);
+					// usage log append (idempotent per turn id) — the stats bar
+					// refolds this on the client after the turn settles. The
+					// provenance message is the turn's FIRST new assistant message.
+					const response = stamped.find((m) => (m as { role?: string }).role === "assistant");
+					if (response && steps.length > 0) {
+						stores.chatStore.appendTurnUsage(chatId, {
+							id: turnUsageId,
+							messageId: response.id,
+							at: new Date().toISOString(),
+							model: modelId,
+							steps,
+						});
+					}
+					// GRAPH GATE (settings-storage wave, 2026-09-19): the write channel —
+					// extraction, its auditor — dies with the master switch.
+					// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
+					// no extraction, no graph, no coverage (v1: the session itself
+					// is the deliverable).
+					if (persistence.persisted && (!requestCycle || requestCycle.dispatched) && record.kind !== "practice" && extractionEnabled(effective.graph)) {
+						// Fresh per-turn read of the graph section's chunk budget
+						// (extraction-UX redesign, 2026-09-24): the trigger compares
+						// against it and the pipeline's batches share it.
+						triggerExtraction(stores, extraction, chatId, effective.graph.extractionChunkTokens);
+					}
+					// PARKED DISMISSAL (owner, 2026-10-04): a dismissal that arrived
+					// mid-turn was parked by the dismiss route (202); now that
+					// persistTurn has landed the turn's messages, apply it against
+					// real truth — BEFORE endTurn, so "turn-settled" guarantees a
+					// subsequent fetch reads the dismissal already in the record
+					// (the same ordering law as persistTurn itself).
+					applyParkedDismissal(stores.chatStore, chatId);
+					// LAST: a poller that sees not-in-flight must read an already-persisted
+					// record — endTurn only after persistTurn has done its job.
+					endTurn(chatId);
+					// And only then does the turn stop being a running object
+					// (background-turn wave, 2026-09-25): a reattach that finds
+					// nothing must find the persisted record current — the same
+					// ordering rule as endTurn.
+					unregisterTurn(chatId);
+					// Wave C steer settlement: the live agent is dead (no more
+					// followUp handoffs) - reconcile the steer registry against
+					// what this run actually persisted (in-run injections
+					// resolve; stranded markers return to pending), then let
+					// the pump take any stragglers down the idle wake.
+					unregisterLiveAgent(chatId);
+					settleSteers(chatId, stamped);
+					// Composer steers (2026-10-03): delivered ids dropped, stranded
+					// ones stay parked for the chat's next run (the registry is the
+					// stranding safety net — the agent's undrained copy died above).
+					reconcileUserSteers(chatId, stamped);
+					// THE SETTLE KICK (owner round 14): the turn settled — if the
+					// projection is now over threshold, the summary starts in the
+					// background, INSIDE the learner's reading/answering pause
+					// (question/problem poses end runs, so this moment is always a
+					// between-runs window). The next turn's ensureCompacted gate
+					// awaits whatever this leaves running; a lost engine or a
+					// beneath-threshold record is a silent no-op. Skipped under
+					// tests (the extraction precedent — scripted chats are
+					// fixtures; the service itself is pinned directly).
+					if (persistence.persisted && process.env.NODE_ENV !== "test" && (!requestCycle || requestCycle.dispatched))
+						kickCompaction(() => {
+							const fresh = effectiveSettings();
+							const spec = resolveConversationSpec(stores.chatStore.getChat(chatId)?.settings, fresh.models.strong);
+							if (!spec || (spec.provider === "chatgpt" && !chatGPTBackgroundAllowed())) return null;
+							let kickEngine: PiEngine;
+							try { kickEngine = piEngineForSpec(spec, true); } catch { return null; }
+							const kickModelId = `${kickEngine.model.provider}:${kickEngine.model.id}`;
+							const freshRecord = stores.chatStore.getChat(chatId);
+							if (!freshRecord) return null;
+							return {
+								chatStore: stores.chatStore,
+								engine: kickEngine,
+								canStart: () => !isTurnRunning(chatId) && !isSessionDeleting(chatId) && (spec.provider !== "chatgpt" || chatGPTBackgroundAllowed()),
+								modelId: kickModelId,
+								kind: freshRecord.kind === "practice" ? "practice" : hasProbeDone(freshRecord.messages) ? "teach" : "probe",
+								thresholdTokens: effectiveThresholdTokens(
+									fresh.compaction?.thresholdTokens,
+									catalogContextLimits().get(kickModelId),
+								),
+								systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher", fresh.agent.prompts).length / 4),
+								dynamicPromptTokens: Math.ceil(("\n\n---\n\n".length + formatLearnerMemory(learnerMemory).length) / 4),
+							};
+						}, chatId);
 				} finally {
 					endTurn(chatId);
 					unregisterTurn(chatId);

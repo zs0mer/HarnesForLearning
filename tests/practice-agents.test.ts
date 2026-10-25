@@ -205,7 +205,7 @@ describe("the practice agent", () => {
 	});
 
 	it("THE RARELY-NEEDED SET (owner round 10): jobs + map readers compose in when their roots are passed", () => {
-		const jobs = { chatId: "c1", jobStore: null as never, spawn: (() => {}) as never, searchAvailable: () => false };
+		const jobs = { chatId: "c1", jobStore: null as never, spawn: (() => { }) as never, searchAvailable: () => false };
 		const graph = { chatStore: null as never, graphStore: null as never };
 		const tools = practiceTools({ ...ctxOf([]), jobs, graph });
 		// Both jobs remain available keylessly; the prober's two map

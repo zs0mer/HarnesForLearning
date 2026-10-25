@@ -339,9 +339,8 @@ function steerText(kind: JobKind, result: ResearchResult | DemoResult | VisualRe
 		if (kind === "research")
 			return `${(result as ResearchResult).brief}\n\nContinue with what you can establish and flag the uncertainty to the learner.`;
 		if (kind === "demo")
-			return `The demo "${(result as DemoResult).title}" could not be built: ${
-				(result as DemoResult).notes ?? "unknown reason"
-			}. Fall back to explaining in prose; if the brief was the problem, re-call demo with a tighter one.`;
+			return `The demo "${(result as DemoResult).title}" could not be built: ${(result as DemoResult).notes ?? "unknown reason"
+				}. Fall back to explaining in prose; if the brief was the problem, re-call demo with a tighter one.`;
 		if (kind === "pdf")
 			return `${(result as PdfResult).brief}\n\nContinue with what you can establish from the session and flag the gap to the learner.`;
 		return `The figure could not be made: ${(result as VisualResult).notes ?? "unknown reason"}. Fall back to prose or mermaid, or re-call visual with a tighter brief.`;
@@ -351,12 +350,10 @@ function steerText(kind: JobKind, result: ResearchResult | DemoResult | VisualRe
 	if (kind === "pdf")
 		return `PDF reading complete — the reader's brief on "${(result as PdfResult).path}" follows, with page citations. Weave it into the lesson and cite pages when you use it:\n\n${(result as PdfResult).brief}`;
 	if (kind === "demo")
-		return `The demo "${(result as DemoResult).title}" is built, headlessly tested, and rendered in the lesson. Builder notes: ${
-			(result as DemoResult).notes ?? "(none)"
-		}.\nTeach with it — reference its controls by name and point the learner at what to try.`;
-	return `The figure is drawn, verified by inspection, and rendered in the lesson. Maker notes: ${
-		(result as VisualResult).notes ?? "(none)"
-	}.\nReference its elements as you teach.`;
+		return `The demo "${(result as DemoResult).title}" is built, headlessly tested, and rendered in the lesson. Builder notes: ${(result as DemoResult).notes ?? "(none)"
+			}.\nTeach with it — reference its controls by name and point the learner at what to try.`;
+	return `The figure is drawn, verified by inspection, and rendered in the lesson. Maker notes: ${(result as VisualResult).notes ?? "(none)"
+		}.\nReference its elements as you teach.`;
 }
 
 /**

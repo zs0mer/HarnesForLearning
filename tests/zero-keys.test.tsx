@@ -50,7 +50,7 @@ describe("hasProviderKey — the zero-keys pill's truth", () => {
 
 describe("ZeroKeysPill — the composer-hoisted notice", () => {
 	it("the pill takes the CTA's chrome with its own testid and copy", () => {
-		const html = renderToStaticMarkup(createElement(ZeroKeysPill, { onOpen: () => {} }));
+		const html = renderToStaticMarkup(createElement(ZeroKeysPill, { onOpen: () => { } }));
 		assert.ok(html.includes('data-testid="setup-cta-keys"'));
 		assert.match(html, />Add a provider key<\/button>/);
 		assert.doesNotMatch(html, /chats start|—/);
@@ -65,10 +65,10 @@ describe("SetupKeysBody — stage 1's self-contained first-key screen", () => {
 		saving: false,
 		error: null,
 		menuOpen: false,
-		onToggleMenu: () => {},
-		onPick: () => {},
-		onValue: () => {},
-		onSave: () => {},
+		onToggleMenu: () => { },
+		onPick: () => { },
+		onValue: () => { },
+		onSave: () => { },
 		menuAnchor: { current: null },
 	};
 

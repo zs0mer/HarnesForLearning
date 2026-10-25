@@ -268,9 +268,8 @@ function MenuTrigger({
 			onClick={() => {
 				if (!disabled) onClick();
 			}}
-			className={`flex h-7 items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors ${
-				disabled ? "cursor-not-allowed" : "hover:border-muted-foreground/50"
-			} ${widthClass}`}
+			className={`flex h-7 items-center gap-1 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground transition-colors ${disabled ? "cursor-not-allowed" : "hover:border-muted-foreground/50"
+				} ${widthClass}`}
 		>
 			<span className="min-w-0 flex-1 truncate">{value || emptyLabel}</span>
 			<span aria-hidden className="text-muted-foreground">
@@ -347,7 +346,7 @@ export function AgentSection({
 		fetch("/api/settings/prompts")
 			.then((r) => r.json())
 			.then((body: { prober: SegmentInfo[]; teacher: SegmentInfo[] }) => setPrompts(body))
-			.catch(() => {});
+			.catch(() => { });
 	}, []);
 
 	// The catalog (federated: keyed providers only), the resolved slots,
@@ -396,7 +395,7 @@ export function AgentSection({
 				}
 				setEngineKeys(present);
 			})
-			.catch(() => {});
+			.catch(() => { });
 		return () => { modelsMounted.current = false; modelsRequest.current++; };
 	}, []);
 
@@ -482,7 +481,7 @@ export function AgentSection({
 		setSegmentStatus("Deleted");
 	}
 
-		/** The search-engine menu row — label + the quiet live-key mark. */
+	/** The search-engine menu row — label + the quiet live-key mark. */
 	const engineOption = (
 		id: (typeof SEARCH_ENGINES)[number] | "auto",
 		label: string,
@@ -495,9 +494,8 @@ export function AgentSection({
 			type="button"
 			data-testid={`engine-option-${id}`}
 			onClick={onPick}
-			className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${
-				active ? "bg-muted/60 text-card-foreground" : "text-card-foreground"
-			}`}
+			className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted ${active ? "bg-muted/60 text-card-foreground" : "text-card-foreground"
+				}`}
 		>
 			<span>{label}</span>
 			<span className="text-muted-foreground">
@@ -683,7 +681,7 @@ export function AgentSection({
 								{thisMenuOpen === "model" && (
 									<MenuShell
 										preferredSide="down"
-											anchorTestid={`slot-model-${slot}`}
+										anchorTestid={`slot-model-${slot}`}
 										testid={`slot-model-menu-${slot}`}
 										menuClass="flex w-[22rem] flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
 									>
@@ -710,7 +708,7 @@ export function AgentSection({
 								{thisMenuOpen === "thinking" && (
 									<MenuShell
 										preferredSide="down"
-											anchorTestid={`slot-thinking-${slot}`}
+										anchorTestid={`slot-thinking-${slot}`}
 										testid={`slot-thinking-menu-${slot}`}
 										menuClass="flex w-44 flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
 									>
@@ -789,7 +787,7 @@ export function AgentSection({
 										}} />
 									</MenuShell>
 								)}
-								</span>
+							</span>
 						</SettingsRow>
 					);
 				})()}
@@ -837,7 +835,7 @@ export function AgentSection({
 								role="radiogroup"
 								aria-label="Quizzing mechanics"
 								className="flex rounded-lg border border-border/60 bg-muted/30 p-0.5"
-								>
+							>
 								{(["choice", "free"] as const).map((m) => {
 									const active = m === "free" ? free : !free;
 									return (
@@ -899,7 +897,7 @@ export function AgentSection({
 								{open && (
 									<MenuShell
 										preferredSide="down"
-											anchorTestid="search-engine-trigger"
+										anchorTestid="search-engine-trigger"
 										testid="search-engine-menu"
 										menuClass="flex w-44 flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
 									>

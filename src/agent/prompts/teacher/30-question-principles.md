@@ -1,6 +1,6 @@
 # Question principles — what a teach-phase check must be
 
-These govern `type: "check"` questions (and explain). Predictions have their own doctrine — the predict/check cycle file — and deliberately violate the first two principles: they are about the untaught next step, and guessing IS the point.
+These govern post-explanation `type: "check"` questions (and explain). Pre-explanation derivation tasks have their own discovery doctrine: they are ungraded, offer a useful next move, and allow requested clues or explicit give-up without prematurely revealing the solution.
 
 Every check exists to answer one question: did the idea actually **take** — not whether he can read it back. The principles:
 

@@ -44,7 +44,7 @@ describe("AgentBuildOptions.toolToggles (the P2 bridge)", () => {
 
 	it("flows into the prober's registry; probe_done survives everything", () => {
 		const chatId = chatStore.createChat("Toggle bridge test").id;
-		const ctx: ProberToolContext = { chatId, chatStore, deliver: () => {}, jobStore, spawn: () => {} };
+		const ctx: ProberToolContext = { chatId, chatStore, deliver: () => { }, jobStore, spawn: () => { } };
 		const prober = createProberAgent(ctx, { engine: fauxEngine(), toolToggles: { ask_user_question: false } });
 		const names = toolNames(prober);
 		assert.ok(!names.includes("ask_user_question"), "the delta dropped the tool");
@@ -72,8 +72,8 @@ describe("AgentBuildOptions.toolToggles (the P2 bridge)", () => {
 describe("parseAgentSettingsBody: tool keys validate at write time", () => {
 	const parse = (tools: Record<string, boolean>) =>
 		parseAgentSettingsBody({ tools }) as
-			| { ok: true; settings: AgentSettings }
-			| { ok: false; error: string };
+		| { ok: true; settings: AgentSettings }
+		| { ok: false; error: string };
 
 	it("a valid job-tool delta parses", () => {
 		const r = parse({ research: false, pdf: false });

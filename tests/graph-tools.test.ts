@@ -47,10 +47,10 @@ function fakeStores(
 		readCoverage: () => [],
 		readSources: () => [],
 		readPositions: () => ({}),
-		writePositions: () => {},
+		writePositions: () => { },
 		readClusterLabels: () => [],
-		appendClusterLabel: () => {},
-		appendNamingRun: () => {},
+		appendClusterLabel: () => { },
+		appendNamingRun: () => { },
 	} as unknown as GraphStore;
 	const chatStore: ChatStore = {
 		listChats: () =>
@@ -65,14 +65,14 @@ const stubJobStore = {
 	createJob: (() => ({})) as never,
 	getJob: (() => undefined) as never,
 	listJobs: (() => []) as never,
-	updateJob: (() => {}) as never,
+	updateJob: (() => { }) as never,
 } as unknown as JobStore;
 
 const baseCtx = {
 	chatId: "c1",
-	deliver: () => {},
+	deliver: () => { },
 	jobStore: stubJobStore,
-	spawn: () => {},
+	spawn: () => { },
 };
 
 // ─── registration (the factory gate) ────────────────────────────────────────

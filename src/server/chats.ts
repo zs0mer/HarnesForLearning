@@ -40,12 +40,12 @@ export type ChatDeleteOutcome =
 	| { ok: false; status: 409; code: "turn_in_flight" | "jobs_running"; error: string; jobIds: string[] }
 	| { ok: false; status: 503; code: "extraction_winding_down"; error: string }
 	| {
-			ok: true;
-			mode: ChatDeleteMode;
-			stats: ChatDeletionStats;
-			jobsRemoved: number;
-			graphRevision: number;
-	  };
+		ok: true;
+		mode: ChatDeleteMode;
+		stats: ChatDeletionStats;
+		jobsRemoved: number;
+		graphRevision: number;
+	};
 
 /**
  * Delete a session (owner rulings 2026-09-22/23): gates first, then the
@@ -97,43 +97,43 @@ export async function deleteChatSession(chatId: string, mode: ChatDeleteMode): P
 		return { ok: false, status: 409, code: "turn_in_flight", error: "The session is busy — try again in a moment", jobIds: [] };
 	}
 	try {
-	if (extractionStatuses().some((run) => run.chatId === chatId)) {
-		abortExtraction(chatId); // true cancellation — spend stops, nothing merges
-		const deadline = Date.now() + WIND_DOWN_TIMEOUT_MS;
-		while (extractionStatuses().some((run) => run.chatId === chatId)) {
-			if (Date.now() > deadline) {
-				return {
-					ok: false,
-					status: 503,
-					code: "extraction_winding_down",
-					error: "The session's extraction is still winding down — try again in a moment",
-				};
+		if (extractionStatuses().some((run) => run.chatId === chatId)) {
+			abortExtraction(chatId); // true cancellation — spend stops, nothing merges
+			const deadline = Date.now() + WIND_DOWN_TIMEOUT_MS;
+			while (extractionStatuses().some((run) => run.chatId === chatId)) {
+				if (Date.now() > deadline) {
+					return {
+						ok: false,
+						status: 503,
+						code: "extraction_winding_down",
+						error: "The session's extraction is still winding down — try again in a moment",
+					};
+				}
+				await new Promise((resolve) => setTimeout(resolve, WIND_DOWN_POLL_MS));
 			}
-			await new Promise((resolve) => setTimeout(resolve, WIND_DOWN_POLL_MS));
 		}
-	}
-	// Memory jobs never steer into the chat. Cancel even deferred work and
-	// remove evidence BEFORE the record/jobs disappear. The deletion claim
-	// prevents a turn (including answers-without-turn) during this await.
-	await learnerMemoryCoordinator.deleteSession(chatId);
-	if (!stores.chatStore.getChat(chatId)) {
-		return { ok: false, status: 404, code: "not_found", error: "No such session" };
-	}
-	const racedJobs = stores.jobStore.listJobs(chatId).filter((job) => job.status === "running" && job.kind !== "memory");
-	if (isTurnRunning(chatId) || racedJobs.length) {
-		return { ok: false, status: 409, code: racedJobs.length ? "jobs_running" : "turn_in_flight", error: "The session became busy — try again when work finishes", jobIds: racedJobs.map((job) => job.id) };
-	}
-	if (extractionStatuses().some((run) => run.chatId === chatId)) {
-		abortExtraction(chatId);
-		return { ok: false, status: 503, code: "extraction_winding_down", error: "The session's extraction is still winding down — try again in a moment" };
-	}
+		// Memory jobs never steer into the chat. Cancel even deferred work and
+		// remove evidence BEFORE the record/jobs disappear. The deletion claim
+		// prevents a turn (including answers-without-turn) during this await.
+		await learnerMemoryCoordinator.deleteSession(chatId);
+		if (!stores.chatStore.getChat(chatId)) {
+			return { ok: false, status: 404, code: "not_found", error: "No such session" };
+		}
+		const racedJobs = stores.jobStore.listJobs(chatId).filter((job) => job.status === "running" && job.kind !== "memory");
+		if (isTurnRunning(chatId) || racedJobs.length) {
+			return { ok: false, status: 409, code: racedJobs.length ? "jobs_running" : "turn_in_flight", error: "The session became busy — try again when work finishes", jobIds: racedJobs.map((job) => job.id) };
+		}
+		if (extractionStatuses().some((run) => run.chatId === chatId)) {
+			abortExtraction(chatId);
+			return { ok: false, status: 503, code: "extraction_winding_down", error: "The session's extraction is still winding down — try again in a moment" };
+		}
 
-	// THE SYNC BLOCK — no awaits below (see the doc comment). Order:
-	// ledgers → jobs → the chat record.
-	const stats = deleteChatTraces(stores.graphStore, chatId, mode);
-	const jobsRemoved = stores.jobStore.deleteJobsForChat(chatId);
-	stores.chatStore.deleteChat(chatId);
-	return { ok: true, mode, stats, jobsRemoved, graphRevision: graphRevision() };
+		// THE SYNC BLOCK — no awaits below (see the doc comment). Order:
+		// ledgers → jobs → the chat record.
+		const stats = deleteChatTraces(stores.graphStore, chatId, mode);
+		const jobsRemoved = stores.jobStore.deleteJobsForChat(chatId);
+		stores.chatStore.deleteChat(chatId);
+		return { ok: true, mode, stats, jobsRemoved, graphRevision: graphRevision() };
 	} finally {
 		try { await learnerMemoryCoordinator.cancelDeletion(chatId); }
 		finally { endSessionDeletion(chatId); }

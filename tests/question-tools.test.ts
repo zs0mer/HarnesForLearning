@@ -199,7 +199,7 @@ describe("the prober's quiz: no nodeId field at all", () => {
 
 	it("the prober's tool registry carries the nodeId-less quiz, probe_done, and the learner-filesystem set", () => {
 		const chatId = newChat("Prober: registry");
-		const tools = createProberTools({ chatId, chatStore, deliver: () => {}, jobStore, spawn: () => {} });
+		const tools = createProberTools({ chatId, chatStore, deliver: () => { }, jobStore, spawn: () => { } });
 		// Fix wave (2026-09-20): the owner ruling adds research + pdf dispatch
 		// to the probe phase's registry (demo/visual stay teach-only).
 		assert.deepEqual(Object.keys(tools).sort(), [
@@ -265,7 +265,7 @@ describe("tool toggles (core/pending.ts + factories)", () => {
 
 	it("createProberTools: absent record = full set; explicit false drops exactly that tool; probe_done survives everything", () => {
 		const chatId = newChat("Prober: toggles");
-		const ctx = { chatId, chatStore, deliver: () => {}, jobStore, spawn: () => {} };
+		const ctx = { chatId, chatStore, deliver: () => { }, jobStore, spawn: () => { } };
 		assert.deepEqual(Object.keys(createProberTools(ctx)).sort(), [
 			"ask_user_question", "find", "grep", "ls", "pdf", "probe", "probe_done", "read", "remember_learner_preference", "research",
 		]);
@@ -292,7 +292,7 @@ describe("tool toggles (core/pending.ts + factories)", () => {
 			chatId,
 			chatStore,
 			jobStore,
-			spawn: () => {},
+			spawn: () => { },
 		};
 		const full = Object.keys(createTeacherTools(ctx)).sort();
 		assert.deepEqual(full, ["ask_user_question", "demo", "find", "grep", "ls", "pdf", "plan_init", "quiz", "read", "remember_learner_preference", "research", "visual"]);

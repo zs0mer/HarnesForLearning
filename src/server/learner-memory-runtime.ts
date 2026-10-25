@@ -12,30 +12,30 @@ import { setMemoryJobHooks } from "./jobs.ts";
 import { memoryDirectory, stores } from "./stores.ts";
 
 export async function resolveMemoryUpdaterEngine(): Promise<PiEngine> {
-	const spec = resolveRoleSpec("memoryUpdater", stores.settingsStore.readSettings());
-	if (!spec) throw new ModelsNotConfiguredError(["cheap"]);
-	if (spec.provider === "chatgpt" || spec.provider === "github-copilot") await refreshConnectionCatalog();
-	if (!providerKeyPresent(spec.provider) ||
-		(spec.provider === "chatgpt" && (!chatGPTBackgroundAllowed() || !chatGPTModel(spec.id))) ||
-		(spec.provider === "github-copilot" && !copilotModelAvailable(spec.id))) {
-		throw new ProviderKeyMissingError(spec.provider, ["cheap"]);
-	}
-	return piEngineForSpec(spec, true);
+  const spec = resolveRoleSpec("memoryUpdater", stores.settingsStore.readSettings());
+  if (!spec) throw new ModelsNotConfiguredError(["cheap"]);
+  if (spec.provider === "chatgpt" || spec.provider === "github-copilot") await refreshConnectionCatalog();
+  if (!providerKeyPresent(spec.provider) ||
+    (spec.provider === "chatgpt" && (!chatGPTBackgroundAllowed() || !chatGPTModel(spec.id))) ||
+    (spec.provider === "github-copilot" && !copilotModelAvailable(spec.id))) {
+    throw new ProviderKeyMissingError(spec.provider, ["cheap"]);
+  }
+  return piEngineForSpec(spec, true);
 }
 
 function createRuntime() {
-	const coordinator = createLearnerMemoryCoordinator({
-		chatStore: stores.chatStore,
-		jobStore: stores.jobStore,
-		memoryStore: stores.learnerMemoryStore,
-		memoryDirectory,
-		resolveEngine: resolveMemoryUpdaterEngine,
-		autoRun: process.env.NODE_ENV !== "test",
-		onError: (error) => console.error("[memory] background update failed:", error),
-	});
-	// Synchronous and durable BEFORE any service can write a new transcript.
-	coordinator.activate();
-	return coordinator;
+  const coordinator = createLearnerMemoryCoordinator({
+    chatStore: stores.chatStore,
+    jobStore: stores.jobStore,
+    memoryStore: stores.learnerMemoryStore,
+    memoryDirectory,
+    resolveEngine: resolveMemoryUpdaterEngine,
+    autoRun: process.env.NODE_ENV !== "test",
+    onError: (error) => console.error("[memory] background update failed:", error),
+  });
+  // Synchronous and durable BEFORE any service can write a new transcript.
+  coordinator.activate();
+  return coordinator;
 }
 
 const key = Symbol.for("learnharness.learner-memory.runtime");
@@ -45,22 +45,22 @@ setMemoryJobHooks(learnerMemoryCoordinator);
 
 /** Recover in the background; configuration writes never wait for model calls. */
 export function refreshLearnerMemory(): void {
-	void learnerMemoryCoordinator.recover().catch((error) => console.error("[memory] recovery failed:", error));
+  void learnerMemoryCoordinator.recover().catch((error) => console.error("[memory] recovery failed:", error));
 }
 
 const watchKey = Symbol.for("learnharness.learner-memory.watch");
 const watches = globalThis as typeof globalThis & { [watchKey]?: boolean };
 if (!watches[watchKey]) {
-	watches[watchKey] = true;
-	onKeysChange(refreshLearnerMemory);
-	onChatGPTChange(refreshLearnerMemory);
-	onCopilotChange(refreshLearnerMemory);
-	if (process.env.NODE_ENV !== "test") refreshLearnerMemory();
+  watches[watchKey] = true;
+  onKeysChange(refreshLearnerMemory);
+  onChatGPTChange(refreshLearnerMemory);
+  onCopilotChange(refreshLearnerMemory);
+  if (process.env.NODE_ENV !== "test") refreshLearnerMemory();
 }
 
 /** A failed enqueue must not invalidate a successful transcript write. Recovery
  * closes this crash gap from durable transcripts, not an ephemeral callback. */
 export function scanLearnerMemory(chatId: string): void {
-	try { learnerMemoryCoordinator.scan(chatId); }
-	catch (error) { console.error(`[chat ${chatId}] memory scan failed:`, error); }
+  try { learnerMemoryCoordinator.scan(chatId); }
+  catch (error) { console.error(`[chat ${chatId}] memory scan failed:`, error); }
 }

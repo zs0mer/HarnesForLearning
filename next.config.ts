@@ -74,6 +74,10 @@ const nextConfig: NextConfig = {
 			// per-platform-binary story as the canvas above (one per build).
 			"node_modules/@resvg/resvg-js-*/**/*",
 			"node_modules/@earendil-works/pi-ai/dist/providers/data/**/*",
+			// Electron's Copilot login loads the same public provider entry as
+			// the server; its lazily loaded OAuth closure must ship as well.
+			"node_modules/@earendil-works/pi-ai/dist/auth/**/*.js",
+			"node_modules/@earendil-works/pi-ai/dist/utils/sleep.js",
 			"node_modules/@earendil-works/pi-agent-core/dist/**/*.json",
 			// Next 16.3.2 native Turbopack applies unanchored excludes while
 			// traversing modules; **/data/**/* still prunes gcp-metadata and

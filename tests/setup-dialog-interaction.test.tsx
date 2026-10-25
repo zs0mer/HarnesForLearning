@@ -6,6 +6,7 @@ import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
 import { SetupDialog } from "../components/setup-dialog.tsx";
+import { notifySettingsSaved } from "../components/settings-signal.ts";
 import type { ModelCatalogEntry } from "../src/core/contracts/models.ts";
 
 // As in render-update-banner: mount real React handlers against an isolated
@@ -181,5 +182,27 @@ describe("setup polish interactions", () => {
 	it("catalog failure uses the approved two-sentence error", async () => {
 		await mount({ catalogFails: true });
 		assert.ok(element('[data-testid="setup-dialog"]').textContent?.includes("Model catalog could not be loaded. Check the connection and retry."));
+	});
+
+	it("a fresh catalog load clears the previous failure and recovers the model pickers", async () => {
+		await mount({ catalogFails: true });
+		assert.ok(element('[data-testid="setup-dialog"]').textContent?.includes("Model catalog could not be loaded."));
+		let resolveCatalog!: (response: Response) => void;
+		globalThis.fetch = async (input) => {
+			if (String(input) === "/api/keys") return Response.json({ providers: [provider], keys: [] });
+			assert.equal(String(input), "/api/models");
+			return new Promise<Response>((resolve) => { resolveCatalog = resolve; });
+		};
+		await act(async () => { notifySettingsSaved("keys"); });
+		assert(!element('[data-testid="setup-dialog"]').textContent?.includes("Model catalog could not be loaded."), "a previous failure must not remain visible while retrying");
+		await act(async () => {
+			resolveCatalog(Response.json({
+				providers: [{ ...provider, keyPresent: true }], models: [model],
+				slots: { strong: null, cheap: null, vision: null },
+			}));
+		});
+		assert.ok(document.querySelector('[data-testid="setup-stage-pickers"]'));
+		await click(element('[data-testid="setup-trigger-strong"]'));
+		assert.ok(document.querySelector('[data-testid="model-option-fixture-text"]'));
 	});
 });

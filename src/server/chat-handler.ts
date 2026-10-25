@@ -58,6 +58,7 @@ import {
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
 import type {CallUsage, SteerMessage} from "../core/contracts.ts";
+import { copilotModelAvailable, refreshCopilotConnection } from "../agent/copilot-bridge.ts";
 
 /**
  * One chat turn over the server-owned native record. Framework-free (plain
@@ -206,6 +207,10 @@ export async function handleChatInput(
 	// persist (nothing durable changes); wake-pipeline turns ride the same
 	// path. The affected tier is strong — the conversation chain's own tier
 	// (a chat.model override still resolves through it).
+	if (conversation.provider === "github-copilot") {
+		await refreshCopilotConnection();
+		if (!copilotModelAvailable(conversation.id)) return Response.json({ error: "GitHub Copilot is disconnected or this model is unavailable. Connect in Providers and select an available model." }, { status: 503 });
+	}
 	if (conversation.provider === "chatgpt") {
 		await refreshConnectionCatalog();
 		if (input.type === "steers" && !chatGPTBackgroundAllowed()) {

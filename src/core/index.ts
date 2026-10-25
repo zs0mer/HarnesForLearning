@@ -49,6 +49,7 @@ export * from "./view.ts";
 export * from "./tool-parts.ts";
 export * from "./prices.ts";
 export type { ChatGPTStatus, ChatGPTControlBridge } from "./contracts/chatgpt.ts";
+export type { CopilotStatus, CopilotControlBridge } from "./contracts/copilot.ts";
 export * from "./cost-summary.ts";
 export * from "./fuzzy.ts";
 // settings.ts + settings-resolution.ts (settings-storage wave, 2026-09-19):

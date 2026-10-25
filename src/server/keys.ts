@@ -1,3 +1,4 @@
+import { copilotConnected } from "../agent/copilot-bridge.ts";
 /**
  * The auth/keys composition (auth-keys wave, 2026-09-19): the server-side
  * key manager behind GET/PUT/DELETE /api/keys.
@@ -202,6 +203,7 @@ export function keyValue(id: string): string | undefined {
  * no key at all: nothing to gate, present by definition. */
 export function providerKeyPresent(provider: string): boolean {
 	if (provider === "chatgpt") return chatGPTConnected();
+	if (provider === "github-copilot") return copilotConnected();
 	const info = AUTH_PROVIDER_KEYS.find((p) => p.id === provider);
 	return info ? keyValue(info.envVar) !== undefined : true;
 }

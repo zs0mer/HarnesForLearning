@@ -21,12 +21,20 @@ import { clampThinkingLevel, getSupportedThinkingLevels, type Api, type Model } 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { piModels } from "../agent/models.ts";
 import { chatGPTConnected, chatGPTModel, chatGPTModels, refreshChatGPTModels } from "../agent/chatgpt-bridge.ts";
+import { copilotConnected, copilotModelAvailable, refreshCopilotConnection } from "../agent/copilot-bridge.ts";
 
 export async function refreshConnectionCatalog(): Promise<void> {
-	await refreshChatGPTModels(piModels().getModels("openai").filter((m): m is Model<"openai-responses"> => m.api === "openai-responses"));
+	await Promise.all([
+		refreshChatGPTModels(piModels().getModels("openai").filter((m): m is Model<"openai-responses"> => m.api === "openai-responses")),
+		refreshCopilotConnection(),
+	]);
 }
 function connectionModel(provider: string, id: string): Model<Api> | undefined {
+	if (provider === "github-copilot" && !copilotModelAvailable(id)) return undefined;
 	return provider === "chatgpt" ? chatGPTModel(id) : piModels().getModel(provider, id);
+}
+function providerModels(provider: string): Model<Api>[] {
+	return piModels().getModels(provider).filter((model) => provider !== "github-copilot" || copilotModelAvailable(model.id));
 }
 function connectionProviderIds(): string[] { return [...piModels().getProviders().map((p) => p.id), "chatgpt"]; }
 import { settingsStore } from "../store/settings.ts";
@@ -134,7 +142,7 @@ export function catalogProviders(): CatalogProvider[] {
 		id: p.id,
 		envVar: p.envVar,
 		keyPresent: keyValue(p.envVar) !== undefined,
-	})).concat([{ id: "chatgpt", envVar: "", keyPresent: chatGPTConnected() }]).sort((a, b) => a.id.localeCompare(b.id));
+	})).concat([{ id: "chatgpt", envVar: "", keyPresent: chatGPTConnected() }, { id: "github-copilot", envVar: "", keyPresent: copilotConnected() }]).sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /** The providers whose key is present — the picker federates exactly
@@ -154,10 +162,10 @@ export function toModelDto(model: Model<Api>): ModelDto {
 		input: [...model.input],
 		supportedLevels: getSupportedThinkingLevels(model),
 		cost: {
-			input: model.cost.input,
-			output: model.cost.output,
-			cacheRead: model.cost.cacheRead,
-			cacheWrite: model.cost.cacheWrite,
+			input: model.provider === "github-copilot" ? 0 : model.cost.input,
+			output: model.provider === "github-copilot" ? 0 : model.cost.output,
+			cacheRead: model.provider === "github-copilot" ? 0 : model.cost.cacheRead,
+			cacheWrite: model.provider === "github-copilot" ? 0 : model.cost.cacheWrite,
 		},
 		contextWindow: model.contextWindow,
 		maxTokens: model.maxTokens,
@@ -176,7 +184,7 @@ export function catalogContextLimits(): Map<string, number> {
 	const index = new Map<string, number>();
 	for (const provider of piModels().getProviders()) {
 		if (!keyed.has(provider.id)) continue;
-		for (const model of piModels().getModels(provider.id)) {
+		for (const model of providerModels(provider.id)) {
 			index.set(`${provider.id}:${model.id}`, model.contextWindow);
 		}
 	}
@@ -193,7 +201,7 @@ export function modelCatalog(): ModelCatalogResponse {
 	const models = piModels()
 		.getProviders()
 		.filter((p) => keyed.has(p.id))
-		.flatMap((p) => piModels().getModels(p.id))
+		.flatMap((p) => providerModels(p.id))
 		.map(toModelDto)
 		.sort((a, b) => (a.provider === b.provider ? a.id.localeCompare(b.id) : a.provider.localeCompare(b.provider)))
 		.concat(chatGPTModels().map(toModelDto));

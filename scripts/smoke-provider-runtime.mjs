@@ -80,6 +80,14 @@ async function probe(standalone) {
 		// factories, never the checkout's module or a direct/fake Google adapter.
 		const entry = pathToFileURL(path.join(root, "node_modules/@earendil-works/pi-ai/dist/index.js"));
 		const { createModels } = await import(entry.href);
+		// Electron loads this exact entry for desktop OAuth. Exercise the lazy
+		// login closure offline as well as token-to-endpoint derivation.
+		const copilot = (await import(new URL("providers/github-copilot.js", entry).href)).githubCopilotProvider();
+		const copilotAuth = await copilot.auth.oauth.toAuth({ type: "oauth", access: "offline-only", refresh: "offline-only", expires: 0, availableModelIds: [] });
+		assert.equal(copilotAuth.baseUrl, "https://api.individual.githubcopilot.com");
+		await assert.rejects(copilot.auth.oauth.login({ signal: AbortSignal.abort(), prompt: async () => "", notify() {} }), /abort|cancel/i);
+		noNetwork();
+		console.log("[smoke-provider-runtime] Copilot lazy OAuth loaded and cancelled offline");
 		const models = createModels();
 		for (const [name, factory] of [["google", "googleProvider"], ["opencode", "opencodeProvider"], ["opencode-go", "opencodeGoProvider"]]) {
 			const provider = (await import(new URL(`providers/${name}.js`, entry).href))[factory]();

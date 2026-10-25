@@ -294,8 +294,12 @@ function timeAgo(startedAt: number): string {
 
 /** Run/stage cost at 3 decimals (pipeline pennies are real money at this
  *  scale); headline totals use 2. Null (unpriced model) renders "—". */
-function fmtRunCost(dollars: number | null, subscription = false): string {
-	if (subscription) return dollars === null ? "ChatGPT plan" : `$${dollars.toFixed(3)} API + ChatGPT plan`;
+function pipelinePlanLabel(subscription: number, copilot: number): string {
+	return [subscription > copilot ? "ChatGPT plan" : "", copilot ? "Copilot plan" : ""].filter(Boolean).join(" + ");
+}
+function fmtRunCost(dollars: number | null, subscription = false, copilot = 0, subscriptionRuns = 0): string {
+	const label = copilot ? pipelinePlanLabel(subscriptionRuns, copilot) : "ChatGPT plan";
+	if (subscription) return dollars === null ? label : `$${dollars.toFixed(3)} API + ${label}`;
 	return dollars === null ? "—" : `$${dollars.toFixed(3)}`;
 }
 function graphUsageLabel(costs: Pick<GraphCostSummary, "stages">): string {
@@ -303,7 +307,8 @@ function graphUsageLabel(costs: Pick<GraphCostSummary, "stages">): string {
 	const plan = stages.some((stage) => (stage.subscriptionRuns ?? 0) > 0);
 	const priced = stages.some((stage) => stage.runs - stage.unpricedRuns - (stage.subscriptionRuns ?? 0) > 0);
 	const dollars = displayCostTotals(costs).totalDollars;
-	return plan ? (priced ? `$${dollars.toFixed(2)} API + ChatGPT plan` : "ChatGPT plan") : `$${dollars.toFixed(2)}`;
+	const label = pipelinePlanLabel(stages.reduce((n, s) => n + (s.subscriptionRuns ?? 0), 0), stages.reduce((n, s) => n + (s.copilotRuns ?? 0), 0));
+	return plan ? (priced ? `$${dollars.toFixed(2)} API + ${label}` : label) : `$${dollars.toFixed(2)}`;
 }
 
 /**
@@ -405,7 +410,7 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 					<div key={label} className="flex items-baseline justify-between gap-2 text-[11px]">
 						<span className="shrink-0 text-muted-foreground">{label}</span>
 						<span className="min-w-0 text-right tabular-nums">
-							{fmtRunCost(stage.runs - stage.unpricedRuns - (stage.subscriptionRuns ?? 0) <= 0 ? null : stage.dollars, (stage.subscriptionRuns ?? 0) > 0)}
+							{fmtRunCost(stage.runs - stage.unpricedRuns - (stage.subscriptionRuns ?? 0) <= 0 ? null : stage.dollars, (stage.subscriptionRuns ?? 0) > 0, stage.copilotRuns, stage.subscriptionRuns)}
 							{stage.unpricedRuns > 0 && (stage.runs - stage.unpricedRuns - (stage.subscriptionRuns ?? 0) > 0 || (stage.subscriptionRuns ?? 0) > 0) && (
 								<span className="text-muted-foreground"> +{stage.unpricedRuns} unpriced</span>
 							)}
@@ -430,7 +435,7 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 									</span>
 								)}
 							</span>
-							<span className="shrink-0 tabular-nums">{fmtRunCost(run.dollars, (run.subscriptionRuns ?? 0) > 0)}{run.dollars === null && run.subscriptionRuns === 1 ? " +1 unpriced" : ""}</span>
+							<span className="shrink-0 tabular-nums">{fmtRunCost(run.dollars, (run.subscriptionRuns ?? 0) > 0, run.copilotRuns, run.subscriptionRuns)}{run.dollars === null && run.subscriptionRuns === 1 ? " +1 unpriced" : ""}</span>
 						</div>
 					))}
 			</div>

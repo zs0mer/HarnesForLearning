@@ -18,10 +18,11 @@
  */
 
 import type { CallUsage, EmissionStats, ExtractionRunUsage } from "./contracts.ts";
-import { callCost, sumSteps, isChatGPTPlan } from "./prices.ts";
+import { callCost, sumSteps, isSubscriptionPlan } from "./prices.ts";
 
 /** One pipeline stage's cumulative cost across every run. */
 export interface StageCost {
+	copilotRuns?: number;
 	/** ChatGPT plan stage-runs, excluded from API dollars and unpriced counts. */
 	subscriptionRuns?: number;
 	/** Inferred USD summed over PRICED runs (partial when unpricedRuns > 0). */
@@ -36,6 +37,7 @@ export interface StageCost {
 
 /** One run in the recent-runs list (extraction or naming). */
 export interface RecentRun {
+	copilotRuns?: number;
 	subscriptionRuns?: number;
 	startedAt: number;
 	/** ISO wall-clock. */
@@ -93,7 +95,7 @@ const emptyStage = (): StageCost => ({ dollars: 0, unpricedRuns: 0, runs: 0, tok
 /** One stage's dollars over its steps; null when the model is unpriced
  *  (all-or-nothing: a stage runs one model). */
 function stageDollars(model: string, steps: readonly CallUsage[]): number | null {
-	if (isChatGPTPlan(model)) return null;
+	if (isSubscriptionPlan(model)) return null;
 	let total = 0;
 	for (const step of steps) {
 		const c = callCost(step, model);
@@ -126,14 +128,16 @@ export function graphCostSummary(input: CostSummaryInput): GraphCostSummary {
 		extraction.runs++;
 		mergeTokens(extraction.tokens, stages.extractor.steps);
 		const extDollars = stageDollars(stages.extractor.model, stages.extractor.steps);
-		if (isChatGPTPlan(stages.extractor.model)) extraction.subscriptionRuns = (extraction.subscriptionRuns ?? 0) + 1;
+		if (stages.extractor.model.startsWith("github-copilot:")) extraction.copilotRuns = (extraction.copilotRuns ?? 0) + 1;
+		if (isSubscriptionPlan(stages.extractor.model)) extraction.subscriptionRuns = (extraction.subscriptionRuns ?? 0) + 1;
 		else if (extDollars === null) extraction.unpricedRuns++;
 		else extraction.dollars += extDollars;
 
 		audit.runs++;
 		mergeTokens(audit.tokens, stages.auditor.steps);
 		const audDollars = stageDollars(stages.auditor.model, stages.auditor.steps);
-		if (isChatGPTPlan(stages.auditor.model)) audit.subscriptionRuns = (audit.subscriptionRuns ?? 0) + 1;
+		if (stages.auditor.model.startsWith("github-copilot:")) audit.copilotRuns = (audit.copilotRuns ?? 0) + 1;
+		if (isSubscriptionPlan(stages.auditor.model)) audit.subscriptionRuns = (audit.subscriptionRuns ?? 0) + 1;
 		else if (audDollars === null) audit.unpricedRuns++;
 		else audit.dollars += audDollars;
 
@@ -142,9 +146,11 @@ export function graphCostSummary(input: CostSummaryInput): GraphCostSummary {
 		const runDollars = allStages.every((d) => d === null)
 			? null
 			: allStages.reduce<number>((a, d) => a + (d ?? 0), 0);
-		const subscriptionRuns = [stages.extractor, stages.auditor].filter((stage) => isChatGPTPlan(stage.model)).length;
+		const subscriptionRuns = [stages.extractor, stages.auditor].filter((stage) => isSubscriptionPlan(stage.model)).length;
+		const copilotRuns = [stages.extractor, stages.auditor].filter((stage) => stage.model.startsWith("github-copilot:")).length;
 		const allSteps = [...stages.extractor.steps, ...stages.auditor.steps];
 		runs.push({
+			...(copilotRuns ? { copilotRuns } : {}),
 			...(subscriptionRuns ? { subscriptionRuns } : {}),
 			startedAt: run.startedAt,
 			at: run.at,

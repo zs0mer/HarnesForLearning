@@ -79,6 +79,8 @@ for (const extra of ["dist", path.join("node_modules", "electron")]) {
 // 3) Sanity: the runtime-read prompt assets must be present (the teacher
 //    agent reads them from disk at request time).
 for (const asset of [
+	path.join("node_modules", "@earendil-works", "pi-ai", "dist", "providers", "github-copilot.js"),
+	path.join("node_modules", "@earendil-works", "pi-ai", "dist", "auth", "oauth", "github-copilot.js"),
 	path.join("src", "agent", "system-prompt.md"),
 	path.join("src", "agent", "prompts", "teacher", "20-teaching.md"),
 ]) {

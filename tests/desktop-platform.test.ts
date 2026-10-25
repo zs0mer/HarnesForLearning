@@ -78,12 +78,28 @@ describe("desktop window chrome", () => {
 		runInNewContext(readFileSync(new URL("../electron/preload.cjs", import.meta.url), "utf8"), context);
 		assert.equal(bridge.platform, "win32");
 		assert.deepEqual(Object.keys(bridge).sort(), [
-			"chatgpt", "expandWindow", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "platform",
+			"chatgpt", "copilot", "expandWindow", "getZoom", "installUpdate", "onUpdateStatus", "onZoom", "platform",
 		]);
 	});
 });
 
 describe("desktop packaging policy", () => {
+	it("custom builds never initialize the updater, including with a feed override", () => {
+		const context = {
+			require: (id: string) => {
+				assert.notEqual(id, "electron-updater", "must not register cached-update quit hooks");
+				return id === "electron"
+					? { app: { isPackaged: true, setName() {}, requestSingleInstanceLock: () => false, quit() {} } }
+					: mainRequire(id);
+			},
+			process: { platform: "linux", argv: [], env: { LH_UPDATE_FEED: "https://example.com" }, on() {} },
+			__dirname: dirname(mainFile),
+		};
+		runInNewContext(mainSource, context, { filename: mainFile });
+		runInNewContext("log = () => {}; setupAutoUpdater(); checkForUpdates(); installUpdateNow();", context);
+		assert.equal(runInNewContext("autoUpdater", context), null);
+	});
+
 	const yaml = require("js-yaml") as { load(source: string): Record<string, any> };
 	const config = yaml.load(readFileSync(new URL("../electron-builder.yml", import.meta.url), "utf8"));
 

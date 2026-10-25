@@ -1662,11 +1662,19 @@ export function sumSteps(steps: readonly CallUsage[]): CallUsage {
  *  or the usage fields are absent (never guess a price). Cached input bills
  *  at the cache-read rate; cache writes bill separately where priced. */
 export function isChatGPTPlan(model: string | undefined): boolean { return model?.startsWith("chatgpt:") === true; }
+export function isSubscriptionPlan(model: string | undefined): boolean { return isChatGPTPlan(model) || model?.startsWith("github-copilot:") === true; }
+export function subscriptionPlanLabel(models: readonly (string | undefined)[]): string {
+	const labels: string[] = [];
+	if (models.some(isChatGPTPlan)) labels.push("ChatGPT plan");
+	if (models.some((model) => model?.startsWith("github-copilot:"))) labels.push("Copilot plan");
+	return labels.join(" + ");
+}
 
 export function callCost(
 	usage: { inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number },
 	model: string,
 ): number | null {
+	if (isSubscriptionPlan(model)) return null;
 	const price = PRICES[model];
 	if (!price) return null;
 	if (usage.inputTokens === undefined || usage.outputTokens === undefined) return null;
@@ -1683,7 +1691,7 @@ export function callCost(
 
 /** One turn's inferred cost — the sum over its steps; null when unpriceable. */
 export function turnCost(turn: TurnUsage): number | null {
-	if (isChatGPTPlan(turn.model)) return null;
+	if (isSubscriptionPlan(turn.model)) return null;
 	let total = 0;
 	for (const step of turn.steps) {
 		const c = callCost(step, turn.model);
@@ -1701,7 +1709,7 @@ export function sessionCost(record: Pick<ChatRecord, "turns">): { cost: number; 
 	let unpriced = 0;
 	let subscription = 0;
 	for (const turn of record.turns ?? []) {
-		if (isChatGPTPlan(turn.model)) { subscription++; continue; }
+		if (isSubscriptionPlan(turn.model)) { subscription++; continue; }
 		const c = turnCost(turn);
 		if (c === null) unpriced++;
 		else cost += c;

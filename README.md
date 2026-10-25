@@ -50,6 +50,8 @@ Future teaching sessions can read the graph instead of starting from scratch. Pr
 
 Add your provider API key and choose your models, then start a session with what you want to understand. LearnHarness supports 30+ provider options, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. Optional dictation and web search use separate service keys.
 
+**GitHub Copilot subscription (desktop):** open Providers → Subscriptions → Connect GitHub Copilot. Review the consent notice, then enter the displayed device code at GitHub. The SDK uses its bundled OAuth client and may enable eligible model policies. Consent covers interactive lessons and background work. Credentials use OS-backed encrypted storage; only models available to the connected account appear in the picker. Copilot limits and premium-request charges apply; the app displays subscription usage, not inferred API charges. One GitHub.com account is supported at a time; GitHub Enterprise and externally launched development servers are not supported. Disconnect removes local credentials; revoke the app separately in GitHub settings if needed.
+
 All three platforms support in-app updates.
 
 ## Your keys, your data

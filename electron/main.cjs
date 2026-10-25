@@ -28,6 +28,9 @@ const { app, BrowserWindow, Menu, ipcMain, session, shell, dialog, safeStorage }
 const { createChatGPT, encryptedStore } = require("./chatgpt.cjs");
 const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt-ipc.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
+const { createCopilot, encryptedCopilotStore } = require("./copilot.cjs");
+const { attachCopilotChild, copilotControl } = require("./copilot-ipc.cjs");
+const { pathToFileURL } = require("node:url");
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -134,6 +137,8 @@ if (process.argv.includes("--browser-service")) {
 let serverProcess = null;
 let chatgpt = null;
 let chatgptChild = null;
+let copilot = null;
+let copilotChild = null;
 // Per-launch request capability, never OAuth tokens and never renderer state.
 let desktopAPISecret = null;
 const trustedAppWindows = new Set();
@@ -218,6 +223,7 @@ function startServer(port) {
 		);
 		serverProcess = child;
 		chatgptChild = attachChatGPTChild(child, chatgpt);
+		copilotChild = attachCopilotChild(child, copilot);
 		const fwd = (buf) => buf.toString().trimEnd().split("\n").forEach((l) => l && log(`server: ${l}`));
 		child.stdout.on("data", fwd);
 		child.stderr.on("data", fwd);
@@ -226,6 +232,9 @@ function startServer(port) {
 			serverProcess = null;
 			chatgptChild?.dispose();
 			chatgptChild = null;
+			copilotChild?.dispose();
+			copilotChild = null;
+			void copilot?.cancel();
 			chatgpt?.close();
 		});
 		resolve(child);
@@ -251,6 +260,7 @@ function waitUntilUp(url, tries = 150) {
 
 function killServer() {
 	chatgpt?.close();
+	void copilot?.cancel();
 	if (!serverProcess) return;
 	const child = serverProcess;
 	serverProcess = null;
@@ -394,35 +404,11 @@ function createWindow(url) {
  * lights, is impossible without rebuilding the window). */
 const ZOOM_LADDER = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
-/* ── Auto-update (Wave C, owner 2026-10-10: silent download + restart ─────
- * banner; checks at startup + every 24h) ─────────────────────────────────
- *
- * Feed: GitHub Releases (electron-builder.yml publish → app-update.yml,
- * baked + signed into the bundle). macOS needs the app signed (it is —
- * Developer ID) and updates ride the zip target (Squirrel.Mac); blockmaps
- * give differential downloads for free. Windows uses NSIS; Linux uses
- * AppImage or DebUpdater (6.8.9 supports deb; installation can request
- * administrator permission via the package manager — owner 2026-10-11).
- *
- * Hard rules:
- *  - DEV NEVER UPDATES: !app.isPackaged skips the updater entirely — the
- *    dev world runs `next dev` and has no signed bundle.
- *  - THE UPDATER CAN NEVER TAKE THE APP DOWN: every event and check is
- *    caught and logged (feed down, disk full, bad signature — all just
- *    log lines; the app keeps working, update or no update).
- *  - LH_UPDATE_FEED (env): overrides the baked GitHub feed with a generic
- *    local server — the pre-release verification drill (serve
- *    latest-mac.yml + zip + blockmap from any localhost HTTP dir and
- *    watch a real installed copy find/download/restart). Test-only seam.
- *
- * Install path: the downloaded update applies on quit (autoInstallOnAppQuit
- * — Squirrel.Mac stages natively and swaps on relaunch). The renderer
- * banner asks for an immediate restart via "lh:update-install"; we kill
- * the child server FIRST — deterministic ordering: the server lives
- * inside the .app bundle Squirrel is about to replace (extraResources),
- * and before-quit alone would race the swap. */
+/* Auto-updates are disabled for this custom build. Keep the existing IPC
+ * surface inert so renderer/preload compatibility does not change. Neither
+ * the baked upstream feed nor LH_UPDATE_FEED may activate the updater. */
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-let autoUpdater = null; // electron-updater's, packaged builds only
+let autoUpdater = null; // deliberately never initialized in custom builds
 
 function broadcastUpdateStatus(status) {
 	for (const win of BrowserWindow.getAllWindows()) {
@@ -462,36 +448,9 @@ function installUpdateNow() {
 }
 
 function setupAutoUpdater() {
-	if (!app.isPackaged) {
-		log("auto-update: dev build — updater disabled");
-		return;
-	}
-	try {
-		autoUpdater = require("electron-updater").autoUpdater;
-	} catch (err) {
-		log(`auto-update: electron-updater unavailable (${err?.message ?? err}) — updates disabled`);
-		return;
-	}
-	const feed = process.env.LH_UPDATE_FEED;
-	if (feed) {
-		autoUpdater.setFeedURL({ provider: "generic", url: feed });
-		log(`auto-update: LH_UPDATE_FEED override → ${feed}`);
-	}
-	autoUpdater.autoDownload = true;
-	autoUpdater.autoInstallOnAppQuit = true;
-	// Route every updater log line through the shell's own log (userData/
-	// logs/main.log) — feed failures must be diagnosable after the fact.
-	autoUpdater.logger = {
-		info: (m) => log(`updater: ${m}`),
-		warn: (m) => log(`updater warn: ${m}`),
-		debug: (m) => {}, // too chatty for the persistent log
-		error: (m) => log(`updater error: ${m}`),
-	};
-	autoUpdater.on("update-downloaded", (info) => {
-		log(`update downloaded: ${info?.version} — banner shown`);
-		broadcastUpdateStatus({ status: "downloaded", version: info?.version ?? null });
-	});
-	autoUpdater.on("error", (err) => log(`updater error: ${err?.message ?? err}`));
+	// Custom builds must never be replaced by upstream releases. Do not even
+	// load electron-updater: it could register quit hooks for a cached update.
+	log("auto-update: disabled for custom builds");
 }
 
 function zoomStep(win, dir) {
@@ -519,7 +478,7 @@ function installMenu() {
 				{ role: "about" },
 				// Manual check (Wave C): answers via native dialog — no renderer
 				// round-trip. The 24h automatic checks stay silent.
-				{ label: "Check for Updates…", click: () => checkForUpdates({ manual: true }) },
+				{ label: "Check for Updates…", enabled: false, click: () => checkForUpdates({ manual: true }) },
 				{ type: "separator" },
 				{ role: "hide" },
 				{ role: "hideOthers" },
@@ -565,6 +524,7 @@ function installMenu() {
 async function main() {
 	app.on("window-all-closed", () => {
 		chatgpt?.pause();
+		void copilot?.cancel();
 		// macOS convention: the app stays resident, reactivated from the Dock.
 		if (process.platform !== "darwin") app.quit();
 	});
@@ -596,6 +556,20 @@ async function main() {
 				for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:chatgpt:changed");
 			},
 		});
+		copilot = createCopilot({
+			store: encryptedCopilotStore(path.join(app.getPath("userData"), "copilot-credentials.enc.json"), safeStorage),
+			// Reuse the traced server SDK rather than shipping a second dependency tree in asar.
+			loadOAuth: async () => {
+				const entry = path.join(path.dirname(serverEntry()), "node_modules", "@earendil-works", "pi-ai", "dist", "providers", "github-copilot.js");
+				const { githubCopilotProvider } = await import(pathToFileURL(entry).href);
+				return githubCopilotProvider().auth.oauth;
+			},
+			openExternal: (target) => shell.openExternal(target),
+			onChange: (status) => {
+				copilotChild?.send({ kind: "state", status });
+				for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:copilot:changed");
+			},
+		});
 		log(`starting server: ${serverEntry()}`);
 		log(`data dir: ${DATA_DIR()}${fs.existsSync(AUTH_FILE()) ? " · auth.json: present" : " · auth.json: ABSENT (no BYOK keys yet)"}`);
 		await startServer(new URL(url).port);
@@ -611,6 +585,11 @@ async function main() {
 		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) return { error: "Untrusted desktop request." };
 		if (!chatgpt || !serverProcess?.connected) return { available: false, pending: false, activeId: null, accounts: [], error: "ChatGPT sign-in requires the desktop app's private server connection. Browser-only and externally launched development servers keep API-key connections." };
 		return chatGPTControl(command, chatgpt);
+	});
+	ipcMain.handle("lh:copilot:control", async (event, command) => {
+		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) return { error: "Untrusted desktop request." };
+		if (!copilot || !serverProcess?.connected) return { available: false, connected: false, pending: false, revision: 0, modelIds: [], device: null, error: "GitHub Copilot sign-in requires the desktop app's private server connection." };
+		return copilotControl(command, copilot);
 	});
 
 	installMenu();

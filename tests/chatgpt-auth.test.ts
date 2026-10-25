@@ -63,6 +63,64 @@ async function loggedIn(options: Parameters<typeof fixture>[0] = {}) {
 	return f;
 }
 
+test("unavailable storage settles notification-driven catalog refreshes without an account", async () => {
+	let refreshes = 0;
+	const pending: Promise<unknown>[] = [];
+	const f = fixture({
+		secure() { throw new Error("secure storage unavailable"); },
+		change() {
+			// Model the renderer's settings-change -> /api/models feedback edge.
+			// Bound the test so a regression fails rather than spinning forever.
+			if (++refreshes <= 10) pending.push(Promise.resolve().then(() => f.service.models()));
+		},
+	});
+	try {
+		await f.service.models();
+		for (let i = 0; i < pending.length; i++) await pending[i];
+		assert(refreshes > 0, "storage failure must still notify observers");
+		assert(refreshes < 10, "unchanged failures must stop triggering catalog refreshes");
+		const settled = refreshes;
+		for (let i = 0; i < 5; i++) {
+			const result = await f.service.models();
+			assert.equal(result.status.available, false);
+			assert.deepEqual(result.models, []);
+			assert(result.status.catalogError);
+		}
+		assert.equal(refreshes, settled);
+		assert.equal(f.requests.length, 0, "missing storage must not initiate model discovery network calls");
+	} finally { f.service.close(); }
+});
+
+test("catalog failure notifies once, recovers, then notifies on a new failure", async () => {
+	let failing = true;
+	let notifications = 0;
+	const f = await loggedIn({
+		change() { notifications++; },
+		provider: async (target) => target.endsWith("/models") && failing ? new Response(null, { status: 503 }) : undefined,
+	});
+	try {
+		const before = notifications;
+		await f.service.models();
+		assert.equal(notifications, before + 1);
+		for (let i = 0; i < 5; i++) await f.service.models();
+		assert.equal(notifications, before + 1);
+		failing = false;
+		const recovered = await f.service.models();
+		assert.equal(recovered.status.catalogError, null);
+		assert.equal(recovered.models.length, 1);
+		assert.equal(notifications, before + 2);
+		await f.service.models();
+		assert.equal(notifications, before + 2);
+		failing = true;
+		const failed = await f.service.models();
+		assert.deepEqual(failed.models, []);
+		assert(failed.authorityRevision > recovered.authorityRevision, "lost models must invalidate existing leases");
+		assert.equal(notifications, before + 3);
+		await f.service.models();
+		assert.equal(notifications, before + 3);
+	} finally { f.service.close(); }
+});
+
 test("PKCE/state/nonce/host identity and exact ephemeral 127.0.0.1 callback; no secret renderer snapshot", async () => {
 	const f = fixture();
 	try {

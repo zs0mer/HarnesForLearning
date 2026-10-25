@@ -446,8 +446,13 @@ function createChatGPT({ store, openExternal, fetch: request = globalThis.fetch,
 			return modelValue();
 		} catch {
 			if (sequence === catalogSequence) {
+				const error = publicError(fail("catalog"));
+				const changed = catalog.length > 0 || catalogError !== error;
 				if (catalog.length) { catalog = []; authorityRevision++; }
-				catalogError = publicError(fail("catalog")); notify();
+				catalogError = error;
+				// Catalog readers refresh on notifications. Repeating an unchanged
+				// failure here would make that refresh trigger itself indefinitely.
+				if (changed) notify();
 			}
 			return modelValue();
 		}

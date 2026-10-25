@@ -19,6 +19,13 @@ between them. Teaching builds understanding one reasoning step at a time, checki
 and repairing gaps along the way. The aim is for the goal to feel obviously true,
 not merely familiar. Separate practice sessions exercise retrieval and application.
 
+The objective is durable, usable learning gained per learner time spent, not
+learning per unit of effort or sheer speed. Productive reasoning and retrieval
+earn their time through understanding, retention, and transfer; incidental work
+and logistics do not. This objective does not impose time or attempt limits or
+override learner control of help and stopping, discovery, per-step graded checks,
+the final synthesis exercise, or required practice retests.
+
 The learner can think out loud—by typing or dictation—while reading and answering.
 The record therefore contains more than right and wrong answers: explanations of
 reasoning, uncertainty, reactions, questions, confidence, and attempts that changed

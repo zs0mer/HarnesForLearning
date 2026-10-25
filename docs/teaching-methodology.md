@@ -46,23 +46,27 @@ Foundations can also be **motivated**: a problem, a question, a condition that d
 
 Derivation and foundation are the two placement moves: derive when the lesson can reach the fact from what is held; place a foundation when it can't. (In the system prompts these are Principle ii and Principle i — the two principles are the practical form of this section.)
 
-## 7. Optimal learning is two independent optimizations
+## 7. Optimal learning — durable, usable learning per learner time spent
 
-### 7a. Effort allocation — the learner's effort goes into the material
+The objective is **durable, usable learning gained per learner time spent**, not learning per unit of effort. Learner time includes reading, setup, attempts, checks, feedback, and recovery from confusion. Neither less effort nor more effort is inherently better: effort earns its place when it improves understanding, retention, or transfer enough to justify the time it takes. Two optimizations serve this objective.
 
-The learner has finite mental effort per session. Optimize its **proportion**, not its amount:
+### 7a. Time allocation — productive work, not effort for its own sake
 
-- **Maximize** the fraction going into direct contact with the material — the actual installation of understanding: following steps, answering checks, holding the new facts.
-- **Minimize** everything that is not direct installation: logistics. Figuring out what to learn, in what order, from what source. Researching, fact-checking, planning, resource-finding, judging reliability.
+The system absorbs logistics: researching, fact-checking, planning, resource-finding, and judging reliability. But direct contact with the material is not automatically productive: incidental computation, repeated setup, and struggle that adds no useful understanding also consume learner time.
 
-The point is *not* to reduce the learner's effort — struggle with the material is how it locks in. The point is that all of it goes into the material. The system absorbs the logistics; the learner never does.
+- Preserve effortful reasoning and retrieval when they strengthen understanding, retention, or transfer.
+- Remove avoidable work around the load-bearing inference; choose explanations, tasks, and requested help that make useful progress possible.
+- Use enough reasoning and structure for the idea to land. Shorter output or faster answers are not improvements if they sacrifice learning.
+
+This is a design objective, not a time or attempt limit. The learner controls how long to keep trying and whether to request help or stop. Never use efficiency to justify unsolicited clues or solutions, inferred surrender, skipped per-step graded checks, or omission of the final synthesis exercise.
 
 ### 7b. The minimal tree — the smallest dependency graph from current to goal
 
-The lesson traverses a dependency structure: facts that require other facts. Optimization: **the minimal tree** — the smallest set of propositions, in the smallest derivation depth, that leads from the current understanding to the goal.
+The lesson traverses a dependency structure: facts that require other facts. Optimization: **the minimal tree** — the smallest effective set of propositions and derivation path that leads from the current understanding to the goal. Minimize learner time without compressing necessary reasoning or weakening durable, usable understanding.
 
 - Nothing the learner already holds is re-taught — the probe prunes those branches.
 - Nothing off the path to the goal is taught, however interesting — coverage is not the goal.
+- Repair missing foundations by the shortest effective relevant route, one checked reasoning step at a time. Detours serve the goal or a learner-chosen question, not completeness for its own sake.
 - The route is searched in planning, not improvised during teaching. Planning is the highest-leverage work in the session and deserves real thought; the quality of the lesson is decided there.
 
 The plan the learner sees is a **lower-resolution view** of this tree: a structural map of the lesson at a coarse abstraction — not the literal reasoning steps. Plan nodes do not correspond one-to-one to reasoning steps or to turns of teaching. The reasoning step is the fine unit actually traversed in teaching; the plan tree is the landscape it crosses. Both exist, at different resolutions, on purpose.

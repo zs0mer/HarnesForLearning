@@ -244,7 +244,7 @@ describe("persistent practice nudges", () => {
 	const doctrine = readFileSync(new URL("../src/agent/prompts/practice/10-doctrine.md", import.meta.url), "utf8");
 	const normalizeWhitespace = (text: string) => text.replace(/\s+/g, " ").trim();
 	const approvedParagraphs = [
-		"- When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress.",
+		"- When a nudge does not land, reassess where the learner is stuck and, on the next request, offer the next necessary piece of information that actually unblocks it; do not repeat an ineffective nudge. Preserve one rung per request and do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress.",
 		"**On a wrong answer**, state the verdict plainly and localize the first break without giving the correction. Give the smallest nudge that lets the learner make the next move, then wait. If that nudge does not land, give another minimal nudge based on the new thinking. A failed attempt is never a reason to reveal the correction or conclude the problem. Continue until the learner finds and completes the correct solution.",
 		"Conclude when the learner has solved the problem correctly or explicitly asks to end it. Do not infer permission to end it from mistakes, elapsed time, the number of attempts, frustration, or an apparent inability to proceed.",
 	];
@@ -365,12 +365,12 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.match(teacher, /Rewriting is a normal, common event/);
 		// planning is the natural verification moment
 		assert.match(teacher, /planning is the natural moment for verification/);
-		// no size ceilings, and the detour keeps the pace (owner round, 2026-10-07)
+		// No arbitrary map ceiling; repairs now earn their learner-time cost.
 		assert.ok(!teacher.includes("Typically 5–15 nodes"), "the node-count cap is dead");
 		assert.match(teacher, /No size ceiling/);
-		assert.match(teacher, /never rush the repair/);
-		assert.match(teacher, /one and only pace/);
-		assert.match(teacher, /nothing to rush/, "the goal reiteration composes");
+		assert.match(teacher, /shortest effective repair relevant to the goal/);
+		assert.match(teacher, /Do not rush his attempts or supply unrequested help/);
+		assert.match(teacher, /durable, usable learning gained per learner time spent/, "the time-efficiency objective composes");
 	});
 
 	it("the prober doctrine steers difficulty by evidence (owner round, 2026-10-07)", () => {

@@ -1,6 +1,6 @@
 ## The question tools
 
-Two instruments. The quiz tool (its exact name depends on the quizzing mechanic the learner chose — multiple choice or free recall) for graded questions; `ask_user_question` for ungraded responses. Teacher-only exception: a pre-explanation derivation task uses free-text `ask_user_question` without options even when the teacher knows the destination, so an attempted discovery does not reveal a committed answer. This does not replace probe assessment or post-explanation checks. Each tool's own description carries its mechanics—read it before first use. What the questions should BE is here.
+Two instruments. The quiz tool (its exact name depends on the quizzing mechanic the learner chose — multiple choice or free recall) for graded questions; `ask_user_question` for ungraded responses. Teacher-only exception: a pre-explanation derivation task or final lesson synthesis exercise uses free-text `ask_user_question` without options even when the teacher knows the destination, so an attempt does not reveal a committed answer. These use the attempt/requested-clue/give-up flow, not automatic grading. This does not replace probe assessment or ordinary post-explanation checks. Each tool's own description carries its mechanics—read it before first use. What the questions should BE is here.
 
 ### Building graded questions — the invariant craft
 

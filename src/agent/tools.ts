@@ -84,8 +84,8 @@ export const askUserQuestionTool: AgentTool<typeof askInputSchema> = {
 		"Ask the learner a single question and pause until they answer. NOT graded — no committed answer is revealed. " +
 		"Use when requirements are ambiguous, preferences are needed, a decision would materially affect the lesson, " +
 		"or you need an open-ended response. In teaching, also use for an ungraded pre-explanation derivation task " +
-		"or requested clue, with free text and no options; the learner can attempt it, request another clue, or give up. " +
-		"Probe assessments and post-explanation checks still use graded tools. ONE question per turn: call a single ask_user_question, then end your " +
+		"or final lesson synthesis exercise or requested clue, with free text and no options; the learner can attempt it, request another clue, or give up. " +
+		"Probe assessments and ordinary post-explanation checks still use graded tools. ONE question per turn: call a single ask_user_question, then end your " +
 		"turn — his answer determines the next.",
 	parameters: askInputSchema,
 	prepareArguments: prepareQuestionArguments,

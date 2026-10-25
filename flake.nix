@@ -1,5 +1,5 @@
 {
-  description = "C++ / Cuda environment";
+  description = "environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

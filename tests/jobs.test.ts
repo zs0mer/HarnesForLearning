@@ -1342,7 +1342,7 @@ describe("prompt composition", () => {
 		}
 	});
 
-	it("the question principles compose into the teacher prompt; the probe's quick-measurement revision landed", () => {
+	it("the question principles compose into the teacher prompt; probing stops at sufficient goal prerequisites", () => {
 		const teacher = composeInstructions("teacher");
 		// the T2a doctrine fragment (user-locked wording 2026-09-15): verbatim presence
 		for (const pin of [
@@ -1362,18 +1362,22 @@ describe("prompt composition", () => {
 		const prober = composeInstructions("prober");
 		assert.ok(!prober.includes("There is no rush"), "the old no-rush framing is retired");
 		assert.ok(
-			prober.includes("every wasted question is resolution the final map doesn't get"),
-			"the efficiency-is-resolution directive is in",
+			prober.includes("Every question should resolve a goal-relevant uncertainty"),
+			"probing spends learner time only on goal-relevant uncertainty",
 		);
+		assert.ok(prober.includes("sufficient prerequisites for the goal, no failure ceiling is needed"), "established prerequisites end escalation without a forced failure");
+		assert.ok(prober.includes("do not search for a failure beyond what the goal requires"), "probing remains bounded by the goal");
 		assert.ok(!prober.includes("Question principles"), "the teach-phase fragment never composes into the prober");
 	});
 
-	it("the predict-check cycle composes into the teacher; the craft chunk reaches BOTH agents (owner 2026-10-03)", () => {
+	it("the discovery-check cycle composes into the teacher; the craft chunk reaches BOTH agents", () => {
 		const teacher = composeInstructions("teacher");
 		// the cycle doctrine (28-predictions.md) — teacher-only
-		assert.ok(teacher.includes("predict → teach → check"), "the cycle line is in");
-		assert.ok(teacher.includes('The prediction (`type: "predict"`)'), "the prediction role section is in");
-		assert.ok(teacher.includes("Skip the prediction"), "the skip rule is in");
+		assert.ok(teacher.includes("task → learner attempt → discovery or give-up → explanation → check"), "discovery precedes explanation and the graded check");
+		assert.ok(teacher.includes("Use `ask_user_question` with free text and no options"), "discovery uses an open ungraded task");
+		assert.ok(teacher.includes('Do NOT use `quiz`, `explain`, or `type: "predict"` for this opening'), "the opening cannot reveal a committed answer");
+		assert.ok(teacher.includes("Give an additional clue ONLY when he requests one"), "clues remain learner-requested");
+		assert.ok(teacher.includes("skip a step's discovery for pure repair"), "the repair exception is preserved");
 		assert.ok(teacher.includes('The check (`type: "check"`)'), "the check role section is in");
 		// the craft + thinking channels (shared/20-question-tools.md) — BOTH agents
 		const prober = composeInstructions("prober");
@@ -1386,7 +1390,7 @@ describe("prompt composition", () => {
 			assert.ok(prompt.includes("thinkingWhileReading"), `${name} knows the reading channel`);
 		}
 		// the cycle is teach-phase doctrine — it never composes into the prober
-		assert.ok(!prober.includes("predict → teach → check"), "the teaching cycle stays out of the prober");
+		assert.ok(!prober.includes("task → learner attempt → discovery or give-up → explanation → check"), "the teaching cycle stays out of the prober");
 	});
 
 	it("the sources-v0 prompt lines compose: read/pdf doctrine in the teacher, the read line in the prober", () => {
